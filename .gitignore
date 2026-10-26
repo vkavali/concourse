@@ -1,0 +1,14 @@
+.env
+*.env
+!.env.example
+build/
+.gradle/
+out/
+*.log
+/data/
+concourse-data/
+*.ogg
+*.wav
+*.pdf
+.DS_Store
+.idea/

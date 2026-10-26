@@ -1,0 +1,15 @@
+concourse:
+  public-base-url: http://localhost:8080
+  admin-token: test-admin
+  phone-hash-salt: test-salt
+  whatsapp:
+    token: test-token
+    phone-number-id: "123456789"
+    verify-token: verify-me
+    app-secret: test-secret
+    graph-base-url: http://localhost:0
+  meta:
+    api-key: test
+    base-url: http://localhost:0
+    spark-model: muse-spark-1.3
+    stt-model: muse-voice-transcribe-1.0

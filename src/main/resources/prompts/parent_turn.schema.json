@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "intent": {
+      "type": "string",
+      "enum": ["WHERE_IS_GATE", "AT_COUNTER", "NEED_HELP", "BAGGAGE_PROBLEM", "CALL_SON", "START_TRIP", "I_AM_HERE",
+               "WHAT_NEXT", "IMMIGRATION_QUESTION", "UNCLEAR", "OTHER"]
+    },
+    "entity": { "type": ["string", "null"], "description": "gate code, flight number, airport or place she mentioned, or null" },
+    "confidence": { "type": "number", "description": "0.0-1.0 that the intent is right" },
+    "tool_proposal": {
+      "type": "string",
+      "enum": ["get_next_stage", "acknowledge_stage", "request_family_help", "create_staff_card", "none"]
+    },
+    "reply_te": { "type": "string", "description": "one or two short spoken-style Telugu sentences" },
+    "english_gloss": { "type": "string", "description": "short English summary of what she said, for the log" }
+  },
+  "required": ["intent", "entity", "confidence", "tool_proposal", "reply_te", "english_gloss"]
+}

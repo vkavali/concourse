@@ -40,21 +40,23 @@ public class TtsClient {
     private final WebClient google;
     private final Path cacheDir;
     private final boolean configured;
-    private final String provider;      // "mms" (Modal) or "google" (Chirp 3 HD te-IN)
+    private final String provider;      // "mms" (Modal: MMS-TTS or SeamlessM4T) or "google" (Chirp 3 HD te-IN)
     private final String googleVoice;
+    private final int speaker;
 
     @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public TtsClient(ConcourseProperties props, WebClient.Builder builder) {
         this(props.tts().baseUrl(), props.tts().token(), props.tts().cacheDir(), props.tts().provider(),
-                props.tts().googleApiKey(), props.tts().googleVoice(), builder);
+                props.tts().googleApiKey(), props.tts().googleVoice(), props.tts().speaker(), builder);
     }
 
     public TtsClient(String baseUrl, String token, String cacheDir, WebClient.Builder builder) {
-        this(baseUrl, token, cacheDir, "mms", null, null, builder);
+        this(baseUrl, token, cacheDir, "mms", null, null, 0, builder);
     }
 
     public TtsClient(String baseUrl, String token, String cacheDir, String provider, String googleApiKey,
-                     String googleVoice, WebClient.Builder builder) {
+                     String googleVoice, int speaker, WebClient.Builder builder) {
+        this.speaker = speaker;
         this.provider = googleApiKey != null && !googleApiKey.isBlank() && "google".equalsIgnoreCase(provider) ? "google" : "mms";
         this.googleVoice = googleVoice == null || googleVoice.isBlank() ? "te-IN-Chirp3-HD-Aoede" : googleVoice;
         boolean mmsConfigured = baseUrl != null && !baseUrl.isBlank();
@@ -91,7 +93,7 @@ public class TtsClient {
 
     public byte[] synthesizeOggOpus(String teluguText, double rate) {
         if (!configured) throw new TtsException(0, "TTS is not configured (TTS_BASE_URL or GOOGLE_TTS_API_KEY)");
-        String key = key(provider + "|" + teluguText, rate);
+        String key = key(provider + "|" + speaker + "|" + teluguText, rate);
         byte[] cached = readCache(key);
         if (cached != null) return cached;
         long t0 = System.currentTimeMillis();
@@ -106,7 +108,7 @@ public class TtsClient {
         try {
             return client.post().uri("/tts")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(Map.of("text", text, "format", "ogg", "rate", rate))
+                    .bodyValue(Map.of("text", text, "format", "ogg", "rate", rate, "speaker", speaker))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class).defaultIfEmpty("")
                             .flatMap(body -> Mono.error(new TtsException(r.statusCode().value(), body))))

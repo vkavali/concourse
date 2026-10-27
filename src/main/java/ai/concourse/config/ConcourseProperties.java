@@ -42,7 +42,9 @@ public record ConcourseProperties(
             @DefaultValue("data/tts-cache") String cacheDir,
             @DefaultValue("mms") String provider,
             String googleApiKey,
-            @DefaultValue("te-IN-Chirp3-HD-Aoede") String googleVoice
+            @DefaultValue("te-IN-Chirp3-HD-Aoede") String googleVoice,
+            /** SeamlessM4T vocoder speaker (0-199); ignored by MMS. */
+            @DefaultValue("0") int speaker
     ) {}
 
     public record Audio(@DefaultValue("ffmpeg") String ffmpegPath) {}

@@ -14,3 +14,6 @@
 - Oct 27: Hibernate `ddl-auto: none` — Flyway owns the schema; entities set their own defaults in `@PrePersist`.
 - Oct 27: Graph API v25.0 (console default). New Facebook account's test WhatsApp Business Account was auto-locked (error 131031) 10 h after creation → appeal filed; messaging layer is behind `MessagingChannel` so a Twilio WhatsApp Sandbox adapter can stand in if Meta does not unlock in time.
 - Oct 27: MMS-TTS on Modal is CPU-only (VITS synthesises a sentence in ~1 s); speaking rate 0.9 for elderly listeners; OGG/Opus 24 kbps mono so a 60 s note stays well under WhatsApp's 512 KB inline-play limit.
+- Oct 27: Voice Transcribe multipart is hand-built (boundary, two parts, CRLF) — Meta's parser rejects Spring's MultipartBodyBuilder output. Keep it byte-identical to the docs' curl example.
+- Oct 27: WhatsApp access = permanent System User token (console tokens expire in 1 h); app published (privacy policy at docs/PRIVACY.md) because unpublished apps get no production webhooks; WABA subscribed to the app via Graph API.
+- Oct 27: `.env` is loaded by the app itself (DotenvEnvironmentPostProcessor) so IDE runs and bootRun behave the same.

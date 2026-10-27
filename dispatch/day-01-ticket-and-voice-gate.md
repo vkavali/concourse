@@ -25,7 +25,17 @@ Read `CLAUDE.md`. Two outcomes today, in this order. The voice gate decides the 
 ## Don't
 - No TTS, no state machine today. No Hindi.
 
-## Day 1 report (written 12:30 CT, updated at end of day)
-- Built, not yet compiled on a real JDK+Maven (sandbox has no Maven Central): STT client, Spark client, audio transcoder, ticket → itinerary pipeline (extractor, validator, airports, summary), journey/contact/event persistence (V2 migration), message router, TTS client, Modal MMS-TTS function, voice-gate eval script, 8 test classes, CI workflow (tests + gitleaks), Gradle wrapper. Validator/airport/transcoder logic smoke-tested with plain javac + ffmpeg.
-- Blocked: WhatsApp test account locked (131031) → appeal filed; Facebook route being retried by vv. Voice gate waits on mom's voice notes + MODEL_API_KEY run on vv's machine.
-- Tomorrow's first task: `./gradlew test` green on vv's machine; run the voice gate; deploy Modal TTS and play 5 Telugu sentences to mom.
+## Day 1 report (Oct 27, 15:50 CT)
+**Passed**
+- Full WhatsApp loop on a real phone: text → reply; boarding-pass photo (crumpled Air India AI173 DEL→SFO) → itinerary with the right two warnings (arrival not printed, date in the past) → Confirm button → confirmed; Telugu voice note → `🎙 నా gate ఎక్కడ ఉంది?` (code-switched, correct).
+- CI green (48 tests, ffmpeg transcoder included). MMS-TTS Telugu deployed on Modal (`/health` ok, `uroman: false`); `say <telugu>` dev command returns a voice note.
+- Meta Model API facts verified in code: `/v1/asr/transcribe` multipart must be hand-built (Spring's MultipartBodyBuilder → "Malformed multipart body"); chat completions with inline image + json_schema works on a phone photo.
+
+**Failed / lessons**
+- First Facebook account's test WABA locked (131031) within 10 h; second new account worked. Console tokens live 1 h → permanent System User token. Unpublished apps receive no webhooks → published with privacy policy URL. WABA must be subscribed to the app (`POST /{waba}/subscribed_apps`).
+
+**Blocked / open**
+- Voice gate (10 real elderly notes) and TTS intelligibility with mom: tonight, via WhatsApp forwards.
+- Hosting: still ngrok on vv's laptop; Fly.io deploy is Day 2's first infra task so the number works while the laptop is closed.
+
+**Tomorrow first**: parent registration (child sends the traveler's number) → parent voice note → Spark intent → Telugu voice reply < 10 s.

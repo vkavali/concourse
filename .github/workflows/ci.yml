@@ -4,6 +4,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write   # lets the failure step post the error summary as a commit comment
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -23,10 +26,28 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
       - name: Test
-        run: ./gradlew test --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew test --no-daemon --console=plain 2>&1 | tee build.log
+      - name: Post failure summary as a commit comment
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "### CI failed: \`gradlew test\` on $GITHUB_SHA"
+            echo
+            echo '```'
+            grep -nE -A3 "error:" build.log | head -200
+            echo '-----'
+            grep -nE "FAILED|Exception|Caused by|tests completed|BUILD|What went wrong|> Task .* FAILED" build.log | head -80
+            echo '```'
+          } > comment.md
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@comment.md >/dev/null
       - name: Upload test report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
           path: build/reports/tests/test
+          if-no-files-found: ignore

@@ -22,30 +22,79 @@ public final class TeluguSpeech {
 
     private static final String[] DIGITS = {"సున్నా", "ఒకటి", "రెండు", "మూడు", "నాలుగు", "ఐదు", "ఆరు", "ఏడు", "ఎనిమిది", "తొమ్మిది"};
 
-    /** Codes (letters+digits mixes) and standalone digit runs. Clock times like 03:45 are spoken as "మూడు నలభై ఐదు" by {@link #time}. */
+    /** Codes (letter+digit mixes) and standalone digit runs. Clock times like 03:45 are spoken by {@link #time}. */
     private static final Pattern CODE_OR_NUMBER = Pattern.compile("\\b(?:[A-Z0-9]*[A-Z][A-Z0-9]*\\d[A-Z0-9]*|\\d[A-Z0-9]*[A-Z][A-Z0-9]*|\\d+)\\b");
     private static final Pattern TIME = Pattern.compile("\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b");
+    private static final Pattern GATE_CODE = Pattern.compile("^([A-Z]{1,2})(\\d{1,2})([A-Z]?)$");
 
+    /**
+     * Text → what the TTS should say. Codes are wrapped in commas so the voice pauses around them
+     * ("గేట్ B12 నుండి" → "గేట్, బి పన్నెండు, నుండి"): the letter and the number get their own beat.
+     */
     public static String spokenForm(String text) {
         if (text == null) return "";
         String t = TIME.matcher(text).replaceAll(m -> time(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2))));
         Matcher m = CODE_OR_NUMBER.matcher(t);
         StringBuilder out = new StringBuilder();
-        while (m.find()) m.appendReplacement(out, Matcher.quoteReplacement(spell(m.group())));
+        while (m.find()) {
+            String token = m.group();
+            String spoken = token.chars().allMatch(Character::isDigit) ? number(token) : ", " + spell(token) + ",";
+            m.appendReplacement(out, Matcher.quoteReplacement(spoken));
+        }
         m.appendTail(out);
-        return out.toString().replaceAll("\\s{2,}", " ").strip();
+        return tidy(out.toString());
     }
 
-    /** Every character spoken separately — that is how gate and flight codes are read out at airports. */
+    /** Gate codes read like airport staff say them ("B twelve"); longer codes and flight numbers digit by digit. */
     public static String spell(String token) {
+        String up = token.toUpperCase();
+        Matcher g = GATE_CODE.matcher(up);
+        if (g.matches()) {
+            String letters = letters(g.group(1));
+            String num = number(g.group(2));
+            String suffix = g.group(3).isEmpty() ? "" : " " + letters(g.group(3));
+            return (letters + " " + num + suffix).strip();
+        }
         StringBuilder sb = new StringBuilder();
-        for (char c : token.toCharArray()) {
-            String w = Character.isDigit(c) ? DIGITS[c - '0'] : LETTERS.get(Character.toUpperCase(c));
+        for (char c : up.toCharArray()) {
+            String w = Character.isDigit(c) ? DIGITS[c - '0'] : LETTERS.get(c);
             if (w == null) continue;
             if (sb.length() > 0) sb.append(' ');
             sb.append(w);
         }
         return sb.toString();
+    }
+
+    private static String letters(String s) {
+        StringBuilder sb = new StringBuilder();
+        for (char c : s.toCharArray()) {
+            String w = LETTERS.get(c);
+            if (w == null) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(w);
+        }
+        return sb.toString();
+    }
+
+    /** Whole numbers: up to 99 as words, longer digit by digit (years, flight numbers). */
+    public static String number(String digits) {
+        if (digits.length() <= 2) return number(Integer.parseInt(digits));
+        StringBuilder sb = new StringBuilder();
+        for (char c : digits.toCharArray()) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(DIGITS[c - '0']);
+        }
+        return sb.toString();
+    }
+
+    private static String tidy(String s) {
+        return s.replaceAll("\\s+,", ",")             // "విమానం ," → "విమానం,"
+                .replaceAll("\\s*,\\s*,", ",")      // ", ," → ","
+                .replaceAll(",\\s*([.!?])", "$1")   // ", ." → "."
+                .replaceAll("^\\s*,\\s*", "")       // leading comma
+                .replaceAll("\\s*,\\s*$", "")       // trailing comma
+                .replaceAll("\\s{2,}", " ")
+                .strip();
     }
 
     /** 03:45 → "మూడు గంటల నలభై ఐదు నిమిషాలకు" (at three forty-five). */

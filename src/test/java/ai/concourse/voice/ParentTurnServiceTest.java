@@ -1,6 +1,7 @@
 package ai.concourse.voice;
 
 import ai.concourse.audio.AudioTranscoder;
+import ai.concourse.card.CardRenderer;
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.config.ConcourseProperties;
 import ai.concourse.itinerary.Airports;
@@ -46,6 +47,7 @@ class ParentTurnServiceTest {
     private final ContactService contacts = mock(ContactService.class);
     private final EventLog eventLog = mock(EventLog.class);
     private final ObjectMapper mapper = new ObjectMapper();
+    private final CardRenderer cards = mock(CardRenderer.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
     private ParentTurnService service;
     private JourneyEntity journey;
@@ -53,7 +55,8 @@ class ParentTurnServiceTest {
     @BeforeEach
     void setUp() {
         service = new ParentTurnService(channel, transcoder, stt, spark, new PromptLoader(mapper), tts, new SafetyPolicy(),
-                journeys, contacts, new Airports(), hasher, eventLog, mapper);
+                journeys, contacts, new Airports(), hasher, eventLog, mapper, cards);
+        when(cards.gateCard(any())).thenReturn(new byte[]{0x50, 0x4E, 0x47});
         journey = new JourneyEntity();
         journey.setId(UUID.randomUUID());
         journey.setStatus("PRE_TRIP");
@@ -94,6 +97,7 @@ class ParentTurnServiceTest {
         service.handleVoiceNote(PARENT, "m1");
 
         verify(channel).sendText(PARENT, "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది.");
+        verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
         verify(channel, never()).sendButtons(any(), any(), any());
         ArgumentCaptor<SparkRequest> req = ArgumentCaptor.forClass(SparkRequest.class);
         verify(spark).completeJson(req.capture(), eq(ParentTurn.class), any(ObjectMapper.class));
@@ -150,10 +154,15 @@ class ParentTurnServiceTest {
     }
 
     @Test
-    void gateButtonAnswersFromFactsOnly() {
+    void gateButtonSendsTheCardAndAnswersFromFactsOnly() {
         service.handleButton(PARENT, ParentTurnService.BTN_GATE);
-        verify(channel).sendText(PARENT, "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది. గేట్ B12 అని రాసిన బోర్డులను అనుసరించండి.");
+        verify(channel).sendImage(eq(PARENT), eq(new byte[]{0x50, 0x4E, 0x47}), contains("గేట్ B12"));
+        verify(channel).sendText(PARENT, TeluguPhrases.gateAnswer(service_facts()));
         verifyNoInteractions(spark);
+    }
+
+    private ai.concourse.journey.JourneyFacts service_facts() {
+        return ai.concourse.journey.JourneyFacts.of(journey, journeys.segments(journey.getId()), new Airports());
     }
 
     @Test

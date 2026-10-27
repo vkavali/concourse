@@ -1,0 +1,2 @@
+- NotoSansTelugu-Variable.ttf — Noto Sans Telugu, © Google, SIL Open Font License 1.1 (https://github.com/google/fonts/tree/main/ofl/notosanstelugu).
+- DejaVuSans.ttf, DejaVuSans-Bold.ttf — DejaVu fonts, Bitstream Vera license + public-domain additions (https://dejavu-fonts.github.io/License.html).

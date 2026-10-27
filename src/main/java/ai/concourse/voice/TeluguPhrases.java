@@ -31,8 +31,10 @@ public final class TeluguPhrases {
         JourneyFacts.Flight f = facts == null ? null : facts.firstFlight();
         if (f == null) return NOT_SET_UP;
         if (f.gate() != null) {
+            // The gate is said twice, slowly, the way staff repeat it; the card shows it in large print.
             return "మీ విమానం " + f.flight() + " గేట్ " + f.gate() + " నుండి బయలుదేరుతుంది. "
-                    + "గేట్ " + f.gate() + " అని రాసిన బోర్డులను అనుసరించండి.";
+                    + "మళ్ళీ చెబుతున్నాను: గేట్ " + f.gate() + ". "
+                    + "గేట్ " + f.gate() + " అని రాసిన బోర్డులను అనుసరించండి. కార్డు చూడండి.";
         }
         String terminal = f.terminal() == null ? "" : " టెర్మినల్ " + f.terminal() + ".";
         return "మీ విమానం " + f.flight() + " గేట్ ఇంకా ప్రకటించలేదు." + terminal

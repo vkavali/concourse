@@ -1,6 +1,7 @@
 package ai.concourse.voice;
 
 import ai.concourse.audio.AudioTranscoder;
+import ai.concourse.card.CardRenderer;
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.itinerary.Airports;
 import ai.concourse.journey.ContactEntity;
@@ -59,11 +60,13 @@ public class ParentTurnService {
     private final PhoneHasher hasher;
     private final EventLog eventLog;
     private final ObjectMapper mapper;
+    private final CardRenderer cards;
 
     public ParentTurnService(MessagingChannel channel, AudioTranscoder transcoder, SttClient stt, SparkClient spark,
                              PromptLoader prompts, TtsClient tts, SafetyPolicy safety, JourneyService journeys,
                              ContactService contacts, Airports airports, PhoneHasher hasher, EventLog eventLog,
-                             ObjectMapper mapper) {
+                             ObjectMapper mapper, CardRenderer cards) {
+        this.cards = cards;
         this.channel = channel;
         this.transcoder = transcoder;
         this.stt = stt;
@@ -120,6 +123,7 @@ public class ParentTurnService {
                 notifyChild(journey.get(), "safety fallback: " + String.join("; ", checked.violations()), turn.englishGloss());
             }
             executeTool(turn, journey.get(), facts, parentWaId);
+            if ("WHERE_IS_GATE".equals(turn.intent()) || "WHAT_NEXT".equals(turn.intent())) sendGateCard(parentWaId, facts);
             speak(parentWaId, checked.text(), null, facts);
             event.put("outcome", checked.ok() ? "replied" : "fallback");
         }
@@ -139,7 +143,10 @@ public class ParentTurnService {
         }
         JourneyFacts facts = facts(journey.get());
         switch (buttonId) {
-            case BTN_GATE -> speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+            case BTN_GATE -> {
+                sendGateCard(parentWaId, facts);
+                speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+            }
             case BTN_HELP -> {
                 notifyChild(journey.get(), "pressed HELP", null);
                 channel.sendText(parentWaId, staffCard(journey.get(), facts));
@@ -174,6 +181,18 @@ public class ParentTurnService {
             case "request_family_help" -> notifyChild(journey, "asked for help", turn.englishGloss());
             case "create_staff_card" -> channel.sendText(parentWaId, staffCard(journey, facts));
             default -> { /* get_next_stage / acknowledge_stage: the state machine arrives on Day 3; the reply already carries the next verified step */ }
+        }
+    }
+
+    /** The gate card: verified facts only, large print, Telugu + English. Sent before the voice so it is on screen while she listens. */
+    private void sendGateCard(String to, JourneyFacts facts) {
+        JourneyFacts.Flight f = facts == null ? null : facts.firstFlight();
+        if (f == null) return;
+        try {
+            String caption = f.gate() == null ? "గేట్ ఇంకా ప్రకటించలేదు · " + f.flight() : "గేట్ " + f.gate() + " · " + f.flight();
+            channel.sendImage(to, cards.gateCard(f), caption);
+        } catch (Exception e) {
+            log.warn("gate card not sent: {}", e.getMessage());
         }
     }
 

@@ -51,7 +51,7 @@ class MessageRouterTest {
         when(contacts.roleOf("17165550100")).thenReturn(ContactEntity.Role.PARENT);
         router.handle(msg(InboundMessage.Type.IMAGE, null, "m2", "image/jpeg", null));
         verify(tickets, never()).ingest(any(), any(), any(), any());
-        verify(whatsApp).sendText(eq("17165550100"), contains("Photo received"));
+        verify(whatsApp).sendText("17165550100", "📷");
     }
 
     @Test

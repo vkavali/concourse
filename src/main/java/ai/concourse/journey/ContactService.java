@@ -27,6 +27,11 @@ public class ContactService {
         return contacts.findById(hasher.hash(waId));
     }
 
+    @Transactional(readOnly = true)
+    public Optional<ContactEntity> findByHash(String phoneHash) {
+        return contacts.findById(phoneHash);
+    }
+
     @Transactional
     public ContactEntity register(String waId, ContactEntity.Role role, String language) {
         String hash = hasher.hash(waId);

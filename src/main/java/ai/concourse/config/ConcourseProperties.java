@@ -35,11 +35,14 @@ public record ConcourseProperties(
             @DefaultValue("120") int timeoutSeconds
     ) {}
 
-    /** Text-to-speech endpoint: facebook/mms-tts-tel served on Modal (see modal/mms_tts.py). */
+    /** Text-to-speech: facebook/mms-tts-tel on Modal (provider "mms", see modal/mms_tts.py) or Google Chirp 3 HD ("google"). */
     public record Tts(
             String baseUrl,
             String token,
-            @DefaultValue("data/tts-cache") String cacheDir
+            @DefaultValue("data/tts-cache") String cacheDir,
+            @DefaultValue("mms") String provider,
+            String googleApiKey,
+            @DefaultValue("te-IN-Chirp3-HD-Aoede") String googleVoice
     ) {}
 
     public record Audio(@DefaultValue("ffmpeg") String ffmpegPath) {}

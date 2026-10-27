@@ -13,8 +13,8 @@ Try:
     curl -X POST "$TTS_BASE_URL/tts" -H "X-Concourse-Token: $TTS_TOKEN" -H "Content-Type: application/json" \
          -d '{"text": "మీ విమానం గేట్ బి పన్నెండు నుండి బయలుదేరుతుంది.", "format": "ogg", "rate": 0.9}' -o note.ogg
 
-Request JSON: {"text": "<Telugu>", "format": "ogg" | "wav", "rate": 0.7-1.3 (1.0 = model default; lower = slower)}
-Response: audio/ogg (Opus, mono, 24 kbps — exactly what WhatsApp expects for a voice note) or audio/wav.
+Request JSON: {"text": "<Telugu>", "format": "ogg" | "wav", "rate": 0.5-1.3 (1.0 = model default; lower = slower; 0.7 default)}
+Response: audio/ogg (Opus, mono, 40 kbps, loudness-normalised — what WhatsApp expects for a voice note) or audio/wav.
 """
 
 import io
@@ -85,7 +85,7 @@ class TeluguTts:
         torch = self.torch
         self.model.speaking_rate = float(rate)
         chunks = []
-        silence = np.zeros(int(self.sample_rate * 0.25), dtype=np.float32)
+        silence = np.zeros(int(self.sample_rate * 0.4), dtype=np.float32)
         for sentence in self._sentences(text) or [text]:
             prepared = self._prepare(sentence)
             if not prepared:
@@ -109,7 +109,9 @@ class TeluguTts:
     def wav_to_ogg_opus(wav: bytes) -> bytes:
         proc = subprocess.run(
             ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "wav", "-i", "pipe:0",
-             "-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "24k", "-application", "voip",
+             # gentle clean-up for phone speakers: cut rumble, normalise loudness, then Opus at 40 kbps
+             "-af", "highpass=f=90,loudnorm=I=-16:TP=-1.5:LRA=9",
+             "-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "40k", "-application", "audio",
              "-map_metadata", "-1", "-f", "ogg", "pipe:1"],
             input=wav, capture_output=True, check=False,
         )
@@ -118,7 +120,7 @@ class TeluguTts:
         return proc.stdout
 
     @modal.method()
-    def synthesize(self, text: str, rate: float = 0.9, fmt: str = "ogg") -> bytes:
+    def synthesize(self, text: str, rate: float = 0.7, fmt: str = "ogg") -> bytes:
         """Remote-callable (modal run / other Modal apps). The HTTP route below is what Concourse uses."""
         wav = self.synthesize_wav(text, rate)
         return wav if fmt == "wav" else self.wav_to_ogg_opus(wav)
@@ -148,10 +150,10 @@ class TeluguTts:
                 raise HTTPException(status_code=413, detail="text too long (max 1500 chars)")
             fmt = (body.get("format") or "ogg").lower()
             try:
-                rate = float(body.get("rate", 0.9))
+                rate = float(body.get("rate", 0.7))
             except (TypeError, ValueError):
-                rate = 0.9
-            rate = min(1.3, max(0.7, rate))
+                rate = 0.7
+            rate = min(1.3, max(0.5, rate))
             try:
                 wav = self.synthesize_wav(text, rate)
             except ValueError as e:
@@ -166,7 +168,7 @@ class TeluguTts:
 @app.local_entrypoint()
 def main(text: str = "నమస్కారం. మీ విమానం గేట్ బి పన్నెండు నుండి బయలుదేరుతుంది.", out: str = "sample.ogg"):
     """`modal run modal/mms_tts.py --text '...' --out sample.ogg` — synthesise once without deploying."""
-    ogg = TeluguTts().synthesize.remote(text, 0.9, "ogg")
+    ogg = TeluguTts().synthesize.remote(text, 0.7, "ogg")
     with open(out, "wb") as f:
         f.write(ogg)
     print(f"wrote {out} ({len(ogg)} bytes)")

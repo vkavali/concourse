@@ -5,9 +5,11 @@ import ai.concourse.config.ConcourseProperties;
 import ai.concourse.itinerary.TicketIngestService;
 import ai.concourse.journey.ContactEntity;
 import ai.concourse.journey.ContactService;
+import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.stt.SttClient;
 import ai.concourse.tts.TtsClient;
+import ai.concourse.voice.ParentTurnService;
 import ai.concourse.voice.VoiceNoteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,7 @@ class MessageRouterTest {
     private final VoiceNoteService voiceNotes = mock(VoiceNoteService.class);
     private final JourneyService journeys = mock(JourneyService.class);
     private final TtsClient tts = mock(TtsClient.class);
+    private final ParentTurnService parentTurns = mock(ParentTurnService.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
     private MessageRouter router;
 
@@ -33,7 +36,7 @@ class MessageRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, journeys, hasher, tts);
+        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, parentTurns, journeys, hasher, tts);
         when(contacts.roleOf(any())).thenReturn(ContactEntity.Role.CHILD);
     }
 
@@ -79,6 +82,35 @@ class MessageRouterTest {
         when(tts.synthesizeOggOpus("నమస్కారం")).thenReturn(new byte[]{1, 2, 3});
         router.handle(msg(InboundMessage.Type.TEXT, "say నమస్కారం", null, null, null));
         verify(whatsApp).sendVoiceNote("17165550100", new byte[]{1, 2, 3});
+    }
+
+    @Test
+    void parentVoiceNoteAndButtonsGoToParentTurns() {
+        when(contacts.roleOf("17165550100")).thenReturn(ContactEntity.Role.PARENT);
+        router.handle(msg(InboundMessage.Type.AUDIO, null, "m5", "audio/ogg", null));
+        verify(parentTurns).handleVoiceNote("17165550100", "m5");
+        verify(voiceNotes, never()).transcribe(any());
+        router.handle(msg(InboundMessage.Type.BUTTON_REPLY, "గేట్ ఎక్కడ?", null, null, "p:gate"));
+        verify(parentTurns).handleButton("17165550100", "p:gate");
+        router.handle(msg(InboundMessage.Type.TEXT, "hello", null, null, null));
+        verify(whatsApp).sendText("17165550100", "🎙");
+    }
+
+    @Test
+    void childSendingAPhoneNumberRegistersTheTraveler() {
+        JourneyEntity j = new JourneyEntity();
+        when(journeys.attachParent(eq(hasher.hash("17165550100")), eq(hasher.hash("919876543210")))).thenReturn(Optional.of(j));
+        router.handle(msg(InboundMessage.Type.TEXT, "+91 98765 43210", null, null, null));
+        verify(contacts).register("919876543210", ContactEntity.Role.PARENT, "te");
+        verify(whatsApp).sendText(eq("17165550100"), contains("Registered +919876543210"));
+    }
+
+    @Test
+    void phoneNumberBeforeTicketIsRefused() {
+        when(journeys.attachParent(any(), any())).thenReturn(Optional.empty());
+        router.handle(msg(InboundMessage.Type.TEXT, "parent +91 98765 43210", null, null, null));
+        verify(contacts, never()).register(any(), any(), any());
+        verify(whatsApp).sendText(eq("17165550100"), contains("Send the ticket first"));
     }
 
     @Test

@@ -36,9 +36,12 @@ concourse:
     stream: ${SPARK_STREAM:true}
     timeout-seconds: ${META_TIMEOUT_SECONDS:120}
   tts:
+    provider: ${TTS_PROVIDER:mms}
     base-url: ${TTS_BASE_URL:}
     token: ${TTS_TOKEN:}
     cache-dir: ${TTS_CACHE_DIR:data/tts-cache}
+    google-api-key: ${GOOGLE_TTS_API_KEY:}
+    google-voice: ${GOOGLE_TTS_VOICE:te-IN-Chirp3-HD-Aoede}
   audio:
     ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
   itinerary:

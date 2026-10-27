@@ -1,6 +1,7 @@
 package ai.concourse.tts;
 
 import ai.concourse.config.ConcourseProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
@@ -18,44 +19,69 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * Telugu text → OGG/Opus voice note bytes, from Meta's open-source MMS-TTS (facebook/mms-tts-tel) served on Modal
- * ({@code modal/mms_tts.py}: {@code POST {base}/tts {"text","format":"ogg","rate"}} → audio/ogg). Results are cached on
- * disk by text hash because stage instructions repeat across journeys. Chirp 3 HD is the documented fallback if MMS
- * fails the Day-1 intelligibility test — it would slot in behind this same interface.
+ * Telugu text → OGG/Opus voice note bytes. Provider "mms" (default): Meta's open-source MMS-TTS (facebook/mms-tts-tel)
+ * served on Modal ({@code modal/mms_tts.py}: {@code POST {base}/tts {"text","format":"ogg","rate"}} → audio/ogg).
+ * Provider "google": Chirp 3 HD te-IN via the Cloud Text-to-Speech REST API (API key) — the documented fallback if the
+ * MMS voice fails the intelligibility test with a real parent. Results are cached on disk by provider+text+rate.
  */
 @Component
 public class TtsClient {
     private static final Logger log = LoggerFactory.getLogger(TtsClient.class);
-    /** Slightly slower than the model default; elderly listeners on a phone speaker. */
-    public static final double DEFAULT_RATE = 0.9;
+    /** MMS speaks ~6 syllables/s at 1.0; 0.7 lands near 4, the pace elderly listeners follow on a phone speaker. */
+    public static final double DEFAULT_RATE = 0.7;
 
     private final WebClient client;
+    private final WebClient google;
     private final Path cacheDir;
     private final boolean configured;
+    private final String provider;      // "mms" (Modal) or "google" (Chirp 3 HD te-IN)
+    private final String googleVoice;
 
     @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public TtsClient(ConcourseProperties props, WebClient.Builder builder) {
-        this(props.tts().baseUrl(), props.tts().token(), props.tts().cacheDir(), builder);
+        this(props.tts().baseUrl(), props.tts().token(), props.tts().cacheDir(), props.tts().provider(),
+                props.tts().googleApiKey(), props.tts().googleVoice(), builder);
     }
 
     public TtsClient(String baseUrl, String token, String cacheDir, WebClient.Builder builder) {
-        this.configured = baseUrl != null && !baseUrl.isBlank();
+        this(baseUrl, token, cacheDir, "mms", null, null, builder);
+    }
+
+    public TtsClient(String baseUrl, String token, String cacheDir, String provider, String googleApiKey,
+                     String googleVoice, WebClient.Builder builder) {
+        this.provider = googleApiKey != null && !googleApiKey.isBlank() && "google".equalsIgnoreCase(provider) ? "google" : "mms";
+        this.googleVoice = googleVoice == null || googleVoice.isBlank() ? "te-IN-Chirp3-HD-Aoede" : googleVoice;
+        boolean mmsConfigured = baseUrl != null && !baseUrl.isBlank();
+        this.configured = "google".equals(this.provider) || mmsConfigured;
+        ExchangeStrategies big = ExchangeStrategies.builder().codecs(c -> c.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build();
+        ReactorClientHttpConnector connector = new ReactorClientHttpConnector(HttpClient.create().responseTimeout(Duration.ofSeconds(90)));
         WebClient.Builder b = builder.clone()
-                .baseUrl(configured ? baseUrl : "http://localhost:0")
-                .clientConnector(new ReactorClientHttpConnector(HttpClient.create().responseTimeout(Duration.ofSeconds(90))))
-                .exchangeStrategies(ExchangeStrategies.builder().codecs(c -> c.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build());
+                .baseUrl(mmsConfigured ? baseUrl : "http://localhost:0")
+                .clientConnector(connector)
+                .exchangeStrategies(big);
         if (token != null && !token.isBlank()) b.defaultHeader("X-Concourse-Token", token);
         this.client = b.build();
+        WebClient.Builder g = builder.clone()
+                .baseUrl("https://texttospeech.googleapis.com/v1")
+                .clientConnector(connector)
+                .exchangeStrategies(big);
+        if (googleApiKey != null && !googleApiKey.isBlank()) g.defaultHeader("X-Goog-Api-Key", googleApiKey);
+        this.google = g.build();
         this.cacheDir = cacheDir == null || cacheDir.isBlank() ? null : Path.of(cacheDir);
     }
 
     public boolean isConfigured() {
         return configured;
+    }
+
+    public String provider() {
+        return provider;
     }
 
     /** OGG/Opus mono bytes ready for {@code WhatsAppClient.uploadMedia(bytes, "audio/ogg", "note.ogg")}. */
@@ -64,15 +90,23 @@ public class TtsClient {
     }
 
     public byte[] synthesizeOggOpus(String teluguText, double rate) {
-        if (!configured) throw new TtsException(0, "TTS_BASE_URL is not configured");
-        String key = key(teluguText, rate);
+        if (!configured) throw new TtsException(0, "TTS is not configured (TTS_BASE_URL or GOOGLE_TTS_API_KEY)");
+        String key = key(provider + "|" + teluguText, rate);
         byte[] cached = readCache(key);
         if (cached != null) return cached;
-        byte[] audio;
+        long t0 = System.currentTimeMillis();
+        byte[] audio = "google".equals(provider) ? googleSynthesize(teluguText, rate) : mmsSynthesize(teluguText, rate);
+        if (audio == null || audio.length < 100) throw new TtsException(0, "empty audio");
+        writeCache(key, audio);
+        log.info("tts ok provider={} chars={} bytes={} ms={}", provider, teluguText.length(), audio.length, System.currentTimeMillis() - t0);
+        return audio;
+    }
+
+    private byte[] mmsSynthesize(String text, double rate) {
         try {
-            audio = client.post().uri("/tts")
+            return client.post().uri("/tts")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(Map.of("text", teluguText, "format", "ogg", "rate", rate))
+                    .bodyValue(Map.of("text", text, "format", "ogg", "rate", rate))
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class).defaultIfEmpty("")
                             .flatMap(body -> Mono.error(new TtsException(r.statusCode().value(), body))))
@@ -83,10 +117,35 @@ public class TtsClient {
         } catch (RuntimeException e) {
             throw new TtsException(0, "tts call failed: " + e.getMessage());
         }
-        if (audio == null || audio.length < 100) throw new TtsException(0, "empty audio");
-        writeCache(key, audio);
-        log.info("tts ok chars={} bytes={}", teluguText.length(), audio.length);
-        return audio;
+    }
+
+    /**
+     * Google Cloud Text-to-Speech, Chirp 3 HD Telugu, OGG_OPUS out. The documented fallback if the MMS voice fails the
+     * intelligibility test with a real parent. Chirp's rate scale differs from MMS: 1.0 here is already a calm pace.
+     */
+    private byte[] googleSynthesize(String text, double rate) {
+        double googleRate = Math.max(0.5, Math.min(1.5, rate + 0.2));
+        Map<String, Object> body = Map.of(
+                "input", Map.of("text", text),
+                "voice", Map.of("languageCode", "te-IN", "name", googleVoice),
+                "audioConfig", Map.of("audioEncoding", "OGG_OPUS", "speakingRate", googleRate, "sampleRateHertz", 48000));
+        try {
+            JsonNode res = google.post().uri("/text:synthesize")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class).defaultIfEmpty("")
+                            .flatMap(b -> Mono.error(new TtsException(r.statusCode().value(), b))))
+                    .bodyToMono(JsonNode.class)
+                    .block(Duration.ofSeconds(60));
+            String b64 = res == null ? null : res.path("audioContent").asText(null);
+            if (b64 == null) throw new TtsException(0, "no audioContent in Google TTS response");
+            return Base64.getDecoder().decode(b64);
+        } catch (TtsException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new TtsException(0, "google tts call failed: " + e.getMessage());
+        }
     }
 
     private static String key(String text, double rate) {

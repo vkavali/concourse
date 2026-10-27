@@ -9,6 +9,8 @@ import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.stt.SttClient;
 import ai.concourse.tts.TtsClient;
+import ai.concourse.voice.ParentTurnService;
+import ai.concourse.voice.TeluguSpeech;
 import ai.concourse.voice.VoiceNoteService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,30 +19,38 @@ import org.springframework.stereotype.Component;
 
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Routes each inbound message by sender role and message type. Runs async so the webhook returns 200 immediately.
- * Day 1 scope: child sends a ticket → itinerary; CONFIRM/FIX buttons; voice notes are transcribed and echoed
- * (voice gate). The parent-side journey conversation arrives on Day 2–3 and plugs in here.
+ * <ul>
+ *   <li>Child (default role): ticket PDF/photo → itinerary; Confirm/Fix; a phone number → registers the traveler;
+ *       "status"; dev commands "say …", "mode parent|child"; voice notes are transcribed and echoed (voice gate).</li>
+ *   <li>Parent: voice notes and buttons go to {@link ParentTurnService}; typed text gets a 🎙 nudge.</li>
+ * </ul>
  */
 @Component
 public class MessageRouter implements InboundMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageRouter.class);
+    private static final Pattern PHONE = Pattern.compile("^(?:parent|traveler|traveller|mom|amma|dad)?\\s*\\+?[\\d\\s().-]{8,20}$", Pattern.CASE_INSENSITIVE);
 
     private final MessagingChannel whatsApp;
     private final ContactService contacts;
     private final TicketIngestService tickets;
     private final VoiceNoteService voiceNotes;
+    private final ParentTurnService parentTurns;
     private final JourneyService journeys;
     private final PhoneHasher hasher;
     private final TtsClient tts;
 
     public MessageRouter(MessagingChannel whatsApp, ContactService contacts, TicketIngestService tickets,
-                         VoiceNoteService voiceNotes, JourneyService journeys, PhoneHasher hasher, TtsClient tts) {
+                         VoiceNoteService voiceNotes, ParentTurnService parentTurns, JourneyService journeys,
+                         PhoneHasher hasher, TtsClient tts) {
         this.whatsApp = whatsApp;
         this.contacts = contacts;
         this.tickets = tickets;
         this.voiceNotes = voiceNotes;
+        this.parentTurns = parentTurns;
         this.journeys = journeys;
         this.hasher = hasher;
         this.tts = tts;
@@ -55,14 +65,18 @@ public class MessageRouter implements InboundMessageHandler {
             switch (m.type()) {
                 case DOCUMENT, IMAGE -> {
                     if (role == ContactEntity.Role.PARENT) {
-                        whatsApp.sendText(from, "Photo received. Sign reading arrives on Day 4."); // placeholder until SignEvidenceService
+                        whatsApp.sendText(from, "📷"); // placeholder until SignEvidenceService (Day 4)
                     } else {
                         tickets.ingest(from, m.mediaId(), m.mimeType(), m.text());
                     }
                 }
                 case AUDIO -> {
-                    SttClient.Transcript t = voiceNotes.transcribe(m.mediaId());
-                    whatsApp.sendText(from, t.isEmpty() ? "I could not hear anything in that voice note." : "🎙 " + t.text());
+                    if (role == ContactEntity.Role.PARENT) {
+                        parentTurns.handleVoiceNote(from, m.mediaId());
+                    } else {
+                        SttClient.Transcript t = voiceNotes.transcribe(m.mediaId());
+                        whatsApp.sendText(from, t.isEmpty() ? "I could not hear anything in that voice note." : "🎙 " + t.text());
+                    }
                 }
                 case BUTTON_REPLY -> handleButton(from, m.interactiveReplyId());
                 case TEXT -> handleText(from, role, m.text());
@@ -79,7 +93,9 @@ public class MessageRouter implements InboundMessageHandler {
 
     private void handleButton(String from, String id) {
         if (id == null) return;
-        if (id.startsWith(TicketIngestService.BUTTON_CONFIRM)) {
+        if (id.startsWith("p:")) {
+            parentTurns.handleButton(from, id);
+        } else if (id.startsWith(TicketIngestService.BUTTON_CONFIRM)) {
             tickets.confirm(from, id.substring(TicketIngestService.BUTTON_CONFIRM.length()));
         } else if (id.startsWith(TicketIngestService.BUTTON_FIX)) {
             tickets.fix(from, id.substring(TicketIngestService.BUTTON_FIX.length()));
@@ -92,34 +108,62 @@ public class MessageRouter implements InboundMessageHandler {
         String raw = text == null ? "" : text.strip();
         String t = raw.toLowerCase(Locale.ROOT);
         if (role == ContactEntity.Role.PARENT) {
-            whatsApp.sendText(from, "🎙"); // parents are never asked to type; Day 2 answers with a voice note
+            if (t.equals("mode child")) { // dev: one phone plays both roles
+                contacts.register(from, ContactEntity.Role.CHILD, "en");
+                whatsApp.sendText(from, "This number is the child again.");
+                return;
+            }
+            whatsApp.sendText(from, "🎙"); // parents are never asked to type
+            return;
+        }
+        if (t.equals("mode parent")) { // dev: one phone plays both roles
+            contacts.register(from, ContactEntity.Role.PARENT, "te");
+            journeys.attachParent(hasher.hash(from), hasher.hash(from));
+            whatsApp.sendText(from, "This number is now the traveler. Send a Telugu voice note. Type 'mode child' to switch back.");
             return;
         }
         if (t.startsWith("say ") && raw.length() > 4) {
-            // Dev/test command: "say <Telugu text>" → Telugu voice note (MMS-TTS on Modal). Used for the intelligibility test.
+            // Dev/test: "say <Telugu text>" → Telugu voice note (MMS-TTS on Modal). Used for the intelligibility test.
             if (!tts.isConfigured()) {
                 whatsApp.sendText(from, "TTS is not configured (TTS_BASE_URL).");
                 return;
             }
             long t0 = System.currentTimeMillis();
-            byte[] ogg = tts.synthesizeOggOpus(raw.substring(4).strip());
+            byte[] ogg = tts.synthesizeOggOpus(TeluguSpeech.spokenForm(raw.substring(4).strip()));
             whatsApp.sendVoiceNote(from, ogg);
             log.info("say: {} chars → {} bytes in {} ms", raw.length() - 4, ogg.length, System.currentTimeMillis() - t0);
             return;
         }
-        if (t.equals("status")) {
+        if (PHONE.matcher(raw).matches() && PhoneHasher.normalize(raw).length() >= 10) {
+            registerParent(from, PhoneHasher.normalize(raw));
+            return;
+        }
+        if (t.equals("status") || t.contains("where is") || t.contains("where's")) {
             Optional<JourneyEntity> j = journeys.latestForChild(hasher.hash(from));
             if (j.isEmpty()) {
                 whatsApp.sendText(from, "No journey yet. Send the ticket (PDF or photo) to start.");
             } else {
                 JourneyEntity je = j.get();
                 String confirmed = je.getItineraryConfirmedAt() == null ? "not confirmed yet" : "confirmed";
+                String parent = je.getParentPhoneHash() == null ? "traveler's number not set — send it to me" : "traveler registered";
                 whatsApp.sendText(from, ItinerarySummary.forChild(je.getPassengerFirstName(), journeys.segments(je.getId()))
-                        + "\nStatus: " + je.getStatus() + " (" + confirmed + ")");
+                        + "\nStage: " + je.getStatus() + " (" + confirmed + "; " + parent + ")"
+                        + "\nI do not know her physical location — only the last stage she confirmed.");
             }
             return;
         }
         whatsApp.sendText(from, "Concourse: send the traveler's ticket (PDF or photo) and I will build the journey. "
-                + "Type 'status' to see the current itinerary.");
+                + "Then send her WhatsApp number (e.g. +91 98765 43210). Type 'status' to see the current itinerary.");
+    }
+
+    private void registerParent(String childWaId, String parentDigits) {
+        Optional<JourneyEntity> j = journeys.attachParent(hasher.hash(childWaId), hasher.hash(parentDigits));
+        if (j.isEmpty()) {
+            whatsApp.sendText(childWaId, "Send the ticket first, then the traveler's number.");
+            return;
+        }
+        contacts.register(parentDigits, ContactEntity.Role.PARENT, "te");
+        whatsApp.sendText(childWaId, "Registered +" + parentDigits + " as the traveler. She can send Telugu voice notes to this number now."
+                + " (Test number: she must also be a verified recipient in the Meta console.)");
     }
 }

@@ -86,6 +86,23 @@ public class JourneyService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<JourneyEntity> latestForParent(String parentPhoneHash) {
+        return journeys.findFirstByParentPhoneHashAndStatusNotOrderByCreatedAtDesc(parentPhoneHash, "COMPLETE");
+    }
+
+    /** Links the traveler's number to the child's latest journey. Returns empty if the child has no journey yet. */
+    @Transactional
+    public Optional<JourneyEntity> attachParent(String childPhoneHash, String parentPhoneHash) {
+        Optional<JourneyEntity> j = journeys.findFirstByChildPhoneHashOrderByCreatedAtDesc(childPhoneHash);
+        j.ifPresent(x -> {
+            x.setParentPhoneHash(parentPhoneHash);
+            journeys.save(x);
+            eventLog.record(x.getId(), EventLog.ACTOR_CHILD, "parent_attached", Map.of());
+        });
+        return j;
+    }
+
+    @Transactional(readOnly = true)
     public Optional<JourneyEntity> find(UUID id) {
         return journeys.findById(id);
     }

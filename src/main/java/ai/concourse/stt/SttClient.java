@@ -2,20 +2,21 @@ package ai.concourse.stt;
 
 import ai.concourse.config.ConcourseProperties;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,16 +47,18 @@ public class SttClient {
     }
 
     private final WebClient client;
+    private final ObjectMapper mapper;
     private final String model;
     private final Duration timeout;
 
     @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
-    public SttClient(ConcourseProperties props, WebClient.Builder builder) {
+    public SttClient(ConcourseProperties props, WebClient.Builder builder, ObjectMapper mapper) {
         this(props.meta().baseUrl(), props.meta().apiKey(), props.meta().sttModel(),
-                Duration.ofSeconds(props.meta().timeoutSeconds()), builder);
+                Duration.ofSeconds(props.meta().timeoutSeconds()), builder, mapper);
     }
 
-    public SttClient(String baseUrl, String apiKey, String model, Duration timeout, WebClient.Builder builder) {
+    public SttClient(String baseUrl, String apiKey, String model, Duration timeout, WebClient.Builder builder, ObjectMapper mapper) {
+        this.mapper = mapper;
         this.model = model;
         this.timeout = timeout;
         this.client = builder.baseUrl(baseUrl)
@@ -77,22 +80,24 @@ public class SttClient {
         if (languageBias != null && !languageBias.isEmpty()) request.put("languageBias", languageBias);
         if (keywords != null && !keywords.isEmpty()) request.put("keywords", keywords);
 
-        MultipartBodyBuilder mb = new MultipartBodyBuilder();
-        mb.part("request", request, MediaType.APPLICATION_JSON);
-        mb.part("audio", new ByteArrayResource(wav) {
-            @Override public String getFilename() { return "audio.wav"; }
-        }).contentType(MediaType.parseMediaType("audio/wav"));
+        String boundary = "concourse" + UUID.randomUUID().toString().replace("-", "");
+        byte[] body;
+        try {
+            body = multipart(boundary, mapper.writeValueAsString(request), wav);
+        } catch (IOException e) {
+            throw new SttException(0, "cannot build request: " + e.getMessage());
+        }
 
         String sessionId = UUID.randomUUID().toString();
         try {
             JsonNode res = client.post()
                     .uri(b -> b.path("/asr/transcribe").queryParam("sessionId", sessionId).build())
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .contentType(MediaType.parseMediaType("multipart/form-data; boundary=" + boundary))
                     .accept(MediaType.APPLICATION_JSON)
-                    .body(BodyInserters.fromMultipartData(mb.build()))
+                    .bodyValue(body)
                     .retrieve()
                     .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class).defaultIfEmpty("")
-                            .flatMap(body -> Mono.error(new SttException(r.statusCode().value(), body))))
+                            .flatMap(b -> Mono.error(new SttException(r.statusCode().value(), b))))
                     .bodyToMono(JsonNode.class)
                     .block(timeout.plusSeconds(5));
             if (res == null) throw new SttException(0, "empty response");
@@ -107,6 +112,25 @@ public class SttClient {
         } catch (RuntimeException e) {
             throw new SttException(0, "transcription failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * Hand-built multipart/form-data, byte-for-byte what curl -F sends: a {@code request} JSON part and an
+     * {@code audio} file part. Meta's endpoint rejected Spring's MultipartBodyBuilder output ("Malformed multipart body").
+     */
+    static byte[] multipart(String boundary, String requestJson, byte[] wav) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(wav.length + 1024);
+        String crlf = "\r\n";
+        out.write(("--" + boundary + crlf
+                + "Content-Disposition: form-data; name=\"request\"" + crlf
+                + "Content-Type: application/json" + crlf + crlf
+                + requestJson + crlf
+                + "--" + boundary + crlf
+                + "Content-Disposition: form-data; name=\"audio\"; filename=\"audio.wav\"" + crlf
+                + "Content-Type: audio/wav" + crlf + crlf).getBytes(StandardCharsets.UTF_8));
+        out.write(wav);
+        out.write((crlf + "--" + boundary + "--" + crlf).getBytes(StandardCharsets.UTF_8));
+        return out.toByteArray();
     }
 
     public static class SttException extends RuntimeException {

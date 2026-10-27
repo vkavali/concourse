@@ -1,5 +1,6 @@
 package ai.concourse.stt;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -23,7 +24,7 @@ class SttClientTest {
         server = new MockWebServer();
         server.start();
         client = new SttClient(server.url("/v1").toString(), "key-1", "muse-voice-transcribe-1.0",
-                Duration.ofSeconds(10), WebClient.builder());
+                Duration.ofSeconds(10), WebClient.builder(), new ObjectMapper());
     }
 
     @AfterEach
@@ -56,6 +57,10 @@ class SttClientTest {
         assertTrue(body.contains("name=\"audio\""), "audio part");
         assertTrue(body.contains("filename=\"audio.wav\""));
         assertTrue(body.contains("RIFF....WAVE"));
+        String boundary = req.getHeader("Content-Type").replaceAll(".*boundary=", "");
+        assertTrue(body.startsWith("--" + boundary + "\r\nContent-Disposition: form-data; name=\"request\"\r\nContent-Type: application/json\r\n\r\n{"), body);
+        assertTrue(body.endsWith("\r\n--" + boundary + "--\r\n"), "closing boundary");
+        assertFalse(req.getHeader("Content-Type").contains("charset"), "no charset parameter on multipart type");
     }
 
     @Test

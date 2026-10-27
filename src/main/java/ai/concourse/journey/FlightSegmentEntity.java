@@ -3,8 +3,12 @@ package ai.concourse.journey;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import org.springframework.data.domain.Persistable;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -15,7 +19,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "flight_segment")
-public class FlightSegmentEntity {
+public class FlightSegmentEntity implements Persistable<UUID> {
     @Id
     private UUID id;
 
@@ -56,12 +60,24 @@ public class FlightSegmentEntity {
     @Column(name = "unverified_fields")
     private String unverifiedFields;
 
+    /** Ids are assigned by code, so Spring Data cannot infer "new" from a null id; without this it would merge() (SELECT + copy) instead of persist(). */
+    @Transient
+    private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() { this.isNew = false; }
+
     @PrePersist
     void prePersist() {
         if (id == null) id = UUID.randomUUID();
         if (source == null) source = "ticket";
     }
 
+    @Override
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
     public UUID getJourneyId() { return journeyId; }

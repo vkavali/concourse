@@ -3,15 +3,19 @@ package ai.concourse.journey;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import org.springframework.data.domain.Persistable;
 
 import java.time.OffsetDateTime;
 
 /** Phone hash → sendable number and role. The only place a phone number is stored (encrypt at rest in production). */
 @Entity
 @Table(name = "contact")
-public class ContactEntity {
+public class ContactEntity implements Persistable<String> {
     public enum Role { PARENT, CHILD }
 
     @Id
@@ -30,12 +34,25 @@ public class ContactEntity {
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
+    /** Ids are assigned by code, so Spring Data cannot infer "new" from a null id; without this it would merge() (SELECT + copy) instead of persist(). */
+    @Transient
+    private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() { this.isNew = false; }
+
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = OffsetDateTime.now();
         if (language == null) language = "te";
     }
 
+    @Override
+    public String getId() { return phoneHash; }
     public String getPhoneHash() { return phoneHash; }
     public void setPhoneHash(String phoneHash) { this.phoneHash = phoneHash; }
     public String getE164() { return e164; }

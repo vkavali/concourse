@@ -3,8 +3,12 @@ package ai.concourse.journey;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import org.springframework.data.domain.Persistable;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -12,7 +16,7 @@ import java.util.UUID;
 /** One trip for one parent, configured by one child. Status values are the journey states in docs/ARCHITECTURE.md. */
 @Entity
 @Table(name = "journey")
-public class JourneyEntity {
+public class JourneyEntity implements Persistable<UUID> {
     @Id
     private UUID id;
 
@@ -43,6 +47,17 @@ public class JourneyEntity {
     @Column(name = "itinerary_confirmed_at")
     private OffsetDateTime itineraryConfirmedAt;
 
+    /** Ids are assigned by code, so Spring Data cannot infer "new" from a null id; without this it would merge() (SELECT + copy) instead of persist(). */
+    @Transient
+    private boolean isNew = true;
+
+    @Override
+    public boolean isNew() { return isNew; }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() { this.isNew = false; }
+
     @PrePersist
     void prePersist() {
         if (id == null) id = UUID.randomUUID();
@@ -51,6 +66,7 @@ public class JourneyEntity {
         if (parentLanguage == null) parentLanguage = "te";
     }
 
+    @Override
     public UUID getId() { return id; }
     public void setId(UUID id) { this.id = id; }
     public String getParentPhoneHash() { return parentPhoneHash; }

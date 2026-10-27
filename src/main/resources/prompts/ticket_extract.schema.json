@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "is_ticket": { "type": "boolean", "description": "true only for a flight ticket, e-ticket, itinerary, booking confirmation or boarding pass" },
+    "reason": { "type": "string", "description": "one sentence: what the document is" },
+    "passenger_first_name": { "type": ["string", "null"], "description": "given name only" },
+    "booking_reference": { "type": ["string", "null"], "description": "PNR / booking reference as printed, or null" },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "airline": { "type": ["string", "null"], "description": "airline name as printed" },
+          "flight_number": { "type": "string", "description": "airline code + number, no spaces, e.g. QR4793" },
+          "origin": { "type": "string", "description": "3-letter IATA code of the departure airport" },
+          "destination": { "type": "string", "description": "3-letter IATA code of the arrival airport" },
+          "departure_local": { "type": "string", "description": "local departure time as printed, YYYY-MM-DDTHH:MM" },
+          "arrival_local": { "type": ["string", "null"], "description": "local arrival time as printed, YYYY-MM-DDTHH:MM, or null if not printed" },
+          "terminal": { "type": ["string", "null"], "description": "departure terminal as printed, or null" },
+          "gate": { "type": ["string", "null"], "description": "gate as printed, or null (usually null on tickets)" },
+          "confidence": { "type": "number", "description": "0.0–1.0 confidence that every field above was clearly printed" },
+          "notes": { "type": "string", "description": "anything inferred, unclear, or missing; empty string if nothing" }
+        },
+        "required": ["airline", "flight_number", "origin", "destination", "departure_local", "arrival_local", "terminal", "gate", "confidence", "notes"]
+      }
+    }
+  },
+  "required": ["is_ticket", "reason", "passenger_first_name", "booking_reference", "segments"]
+}

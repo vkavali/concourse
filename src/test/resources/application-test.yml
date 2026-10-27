@@ -13,3 +13,8 @@ concourse:
     base-url: http://localhost:0
     spark-model: muse-spark-1.3
     stt-model: muse-voice-transcribe-1.0
+  tts:
+    base-url: ""
+    cache-dir: ""
+  itinerary:
+    allow-past-dates: true

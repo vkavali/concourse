@@ -7,8 +7,10 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -19,8 +21,12 @@ import java.util.Map;
  * Inbound media: resolve media id -> URL -> bytes (bearer required on the download too).
  */
 @Component
-public class WhatsAppClient {
+public class WhatsAppClient implements MessagingChannel {
+    /** Voice notes are ~100 KB, ticket PDFs and photos a few MB; WebClient's 256 KB default would reject them. */
+    private static final int MAX_MEDIA_BYTES = 32 * 1024 * 1024;
+
     private final WebClient graph;
+    private final WebClient downloader;
     private final String phoneNumberId;
     private final String token;
 
@@ -31,17 +37,26 @@ public class WhatsAppClient {
     WhatsAppClient(String graphBaseUrl, String phoneNumberId, String token, WebClient.Builder builder) {
         this.phoneNumberId = phoneNumberId;
         this.token = token;
-        this.graph = builder.baseUrl(graphBaseUrl)
+        ExchangeStrategies large = ExchangeStrategies.builder()
+                .codecs(c -> c.defaultCodecs().maxInMemorySize(MAX_MEDIA_BYTES)).build();
+        this.graph = builder.clone().baseUrl(graphBaseUrl)
                 .defaultHeader("Authorization", "Bearer " + token)
+                .exchangeStrategies(large)
+                .build();
+        this.downloader = builder.clone()
+                .defaultHeader("Authorization", "Bearer " + token)
+                .exchangeStrategies(large)
                 .build();
     }
 
+    @Override
     public String sendText(String to, String body) {
         return send(Map.of("messaging_product", "whatsapp", "to", to, "type", "text",
                 "text", Map.of("preview_url", false, "body", body)));
     }
 
     /** Up to 3 quick-reply buttons; ids are what come back in interactive.button_reply.id. */
+    @Override
     public String sendButtons(String to, String body, List<Button> buttons) {
         if (buttons.isEmpty() || buttons.size() > 3) throw new IllegalArgumentException("1..3 buttons");
         List<Map<String, Object>> btns = buttons.stream()
@@ -64,6 +79,17 @@ public class WhatsAppClient {
                 .body(BodyInserters.fromMultipartData(mb.build()))
                 .retrieve().bodyToMono(JsonNode.class).block(Duration.ofSeconds(30));
         return res.path("id").asText();
+    }
+
+    /** Upload + send in one step. */
+    @Override
+    public String sendVoiceNote(String to, byte[] oggOpus) {
+        return sendVoiceNote(to, uploadMedia(oggOpus, "audio/ogg", "note.ogg"));
+    }
+
+    @Override
+    public String sendImage(String to, byte[] png, String caption) {
+        return sendImage(to, uploadMedia(png, "image/png", "card.png"), caption);
     }
 
     /** Sends an uploaded OGG/Opus mono file as a voice note (voice:true renders mic icon + autoplay-on-open). */
@@ -94,11 +120,11 @@ public class WhatsAppClient {
     }
 
     /** Inbound media: id -> temporary URL -> bytes. The download URL also requires the bearer token. */
+    @Override
     public byte[] downloadMedia(String mediaId) {
         JsonNode meta = graph.get().uri("/{id}", mediaId).retrieve().bodyToMono(JsonNode.class).block(Duration.ofSeconds(15));
         String url = meta.path("url").asText();
-        return WebClient.create().get().uri(url)
-                .header("Authorization", "Bearer " + token)
+        return downloader.get().uri(URI.create(url))
                 .retrieve().bodyToMono(byte[].class).block(Duration.ofSeconds(60));
     }
 

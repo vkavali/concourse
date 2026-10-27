@@ -117,8 +117,11 @@ public class MessageRouter implements InboundMessageHandler {
             return;
         }
         if (t.equals("mode parent")) { // dev: one phone plays both roles
+            if (journeys.attachParent(hasher.hash(from), hasher.hash(from)).isEmpty()) {
+                whatsApp.sendText(from, "No journey yet — send the ticket first, then 'mode parent'.");
+                return;
+            }
             contacts.register(from, ContactEntity.Role.PARENT, "te");
-            journeys.attachParent(hasher.hash(from), hasher.hash(from));
             whatsApp.sendText(from, "This number is now the traveler. Send a Telugu voice note. Type 'mode child' to switch back.");
             return;
         }

@@ -125,10 +125,20 @@ public class TtsClient {
      */
     private byte[] googleSynthesize(String text, double rate) {
         double googleRate = Math.max(0.5, Math.min(1.5, rate + 0.2));
+        try {
+            return googleCall(text, Map.of("audioEncoding", "OGG_OPUS", "speakingRate", googleRate, "sampleRateHertz", 48000));
+        } catch (TtsException e) {
+            if (e.status() != 400) throw e;
+            log.warn("google tts rejected the request ({}); retrying without speakingRate", e.getMessage());
+            return googleCall(text, Map.of("audioEncoding", "OGG_OPUS", "sampleRateHertz", 48000));
+        }
+    }
+
+    private byte[] googleCall(String text, Map<String, Object> audioConfig) {
         Map<String, Object> body = Map.of(
                 "input", Map.of("text", text),
                 "voice", Map.of("languageCode", "te-IN", "name", googleVoice),
-                "audioConfig", Map.of("audioEncoding", "OGG_OPUS", "speakingRate", googleRate, "sampleRateHertz", 48000));
+                "audioConfig", audioConfig);
         try {
             JsonNode res = google.post().uri("/text:synthesize")
                     .contentType(MediaType.APPLICATION_JSON)

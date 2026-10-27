@@ -84,6 +84,8 @@ class TeluguTts:
 
         torch = self.torch
         self.model.speaking_rate = float(rate)
+        self.model.noise_scale = 0.55          # default 0.667: a little less breathy jitter, smoother prosody
+        self.model.noise_scale_duration = 0.6  # default 0.8: steadier syllable timing
         chunks = []
         silence = np.zeros(int(self.sample_rate * 0.4), dtype=np.float32)
         for sentence in self._sentences(text) or [text]:
@@ -110,7 +112,7 @@ class TeluguTts:
         proc = subprocess.run(
             ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "wav", "-i", "pipe:0",
              # gentle clean-up for phone speakers: cut rumble, normalise loudness, then Opus at 40 kbps
-             "-af", "highpass=f=90,loudnorm=I=-16:TP=-1.5:LRA=9",
+             "-af", "highpass=f=100,equalizer=f=3200:t=q:w=1.2:g=-5,lowpass=f=6500,loudnorm=I=-20:TP=-2:LRA=9",
              "-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "40k", "-application", "audio",
              "-map_metadata", "-1", "-f", "ogg", "pipe:1"],
             input=wav, capture_output=True, check=False,

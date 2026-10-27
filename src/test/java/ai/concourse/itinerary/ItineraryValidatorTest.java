@@ -60,7 +60,11 @@ class ItineraryValidatorTest {
 
     @Test
     void arrivalBeforeDepartureIsAnError() {
-        ValidatedItinerary v = validator.validate(ticket(seg("QR1", "HYD", "DOH", "2026-11-28T03:45", "2026-11-28T02:05", 1.0)));
+        // 02:05 Doha is 50 min AFTER 03:45 Hyderabad (IST is +2:30 ahead of Qatar): a tempting but wrong "error" case.
+        ValidatedItinerary ok = validator.validate(ticket(seg("QR1", "HYD", "DOH", "2026-11-28T03:45", "2026-11-28T02:05", 1.0)));
+        assertFalse(ok.hasErrors(), ok.issues().toString());
+        // An arrival printed the evening before departure really is impossible.
+        ValidatedItinerary v = validator.validate(ticket(seg("QR1", "HYD", "DOH", "2026-11-28T03:45", "2026-11-27T20:00", 1.0)));
         assertTrue(v.hasErrors());
         assertTrue(v.errors().get(0).message().contains("not after"));
     }

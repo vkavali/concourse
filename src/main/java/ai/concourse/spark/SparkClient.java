@@ -23,6 +23,7 @@ import reactor.netty.http.client.HttpClient;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Muse Spark via the OpenAI-compatible Chat Completions endpoint ({@code POST {base}/chat/completions}).
@@ -49,12 +50,13 @@ public class SparkClient {
     private final boolean stream;
     private final Duration timeout;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public SparkClient(ConcourseProperties props, WebClient.Builder builder, ObjectMapper mapper) {
         this(props.meta().baseUrl(), props.meta().apiKey(), props.meta().sparkModel(), props.meta().stream(),
                 Duration.ofSeconds(props.meta().timeoutSeconds()), builder, mapper);
     }
 
-    SparkClient(String baseUrl, String apiKey, String model, boolean stream, Duration timeout,
+    public SparkClient(String baseUrl, String apiKey, String model, boolean stream, Duration timeout,
                 WebClient.Builder builder, ObjectMapper mapper) {
         this.mapper = mapper;
         this.model = model;

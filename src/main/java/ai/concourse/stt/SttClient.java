@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Muse Voice Transcribe, file mode: {@code POST {base}/asr/transcribe?sessionId=...} as multipart with a
@@ -48,12 +49,13 @@ public class SttClient {
     private final String model;
     private final Duration timeout;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public SttClient(ConcourseProperties props, WebClient.Builder builder) {
         this(props.meta().baseUrl(), props.meta().apiKey(), props.meta().sttModel(),
                 Duration.ofSeconds(props.meta().timeoutSeconds()), builder);
     }
 
-    SttClient(String baseUrl, String apiKey, String model, Duration timeout, WebClient.Builder builder) {
+    public SttClient(String baseUrl, String apiKey, String model, Duration timeout, WebClient.Builder builder) {
         this.model = model;
         this.timeout = timeout;
         this.client = builder.baseUrl(baseUrl)

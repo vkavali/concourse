@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Telugu text → OGG/Opus voice note bytes, from Meta's open-source MMS-TTS (facebook/mms-tts-tel) served on Modal
@@ -37,11 +38,12 @@ public class TtsClient {
     private final Path cacheDir;
     private final boolean configured;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public TtsClient(ConcourseProperties props, WebClient.Builder builder) {
         this(props.tts().baseUrl(), props.tts().token(), props.tts().cacheDir(), builder);
     }
 
-    TtsClient(String baseUrl, String token, String cacheDir, WebClient.Builder builder) {
+    public TtsClient(String baseUrl, String token, String cacheDir, WebClient.Builder builder) {
         this.configured = baseUrl != null && !baseUrl.isBlank();
         WebClient.Builder b = builder.clone()
                 .baseUrl(configured ? baseUrl : "http://localhost:0")

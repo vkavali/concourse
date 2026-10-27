@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Turns a raw {@link Itinerary} into verified journey facts, or says exactly why it can't.
@@ -42,11 +43,12 @@ public class ItineraryValidator {
     private final int maxDaysAhead;
     private final Clock clock;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public ItineraryValidator(Airports airports, ConcourseProperties props) {
         this(airports, props.itinerary().allowPastDates(), props.itinerary().maxDaysAhead(), Clock.systemUTC());
     }
 
-    ItineraryValidator(Airports airports, boolean allowPastDates, int maxDaysAhead, Clock clock) {
+    public ItineraryValidator(Airports airports, boolean allowPastDates, int maxDaysAhead, Clock clock) {
         this.airports = airports;
         this.allowPastDates = allowPastDates;
         this.maxDaysAhead = maxDaysAhead;

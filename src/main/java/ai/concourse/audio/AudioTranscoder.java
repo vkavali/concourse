@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * ffmpeg wrapper for the two conversions Concourse needs:
@@ -25,11 +26,12 @@ import java.util.stream.Stream;
 public class AudioTranscoder {
     private final String ffmpeg;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public AudioTranscoder(ConcourseProperties props) {
         this(props.audio().ffmpegPath());
     }
 
-    AudioTranscoder(String ffmpeg) {
+    public AudioTranscoder(String ffmpeg) {
         this.ffmpeg = ffmpeg == null || ffmpeg.isBlank() ? "ffmpeg" : ffmpeg;
     }
 

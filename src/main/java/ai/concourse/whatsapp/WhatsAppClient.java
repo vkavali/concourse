@@ -14,6 +14,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Thin client for the WhatsApp Business Cloud API (Graph API).
@@ -30,11 +31,12 @@ public class WhatsAppClient implements MessagingChannel {
     private final String phoneNumberId;
     private final String token;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public WhatsAppClient(ConcourseProperties props, WebClient.Builder builder) {
         this(props.whatsapp().graphBaseUrl(), props.whatsapp().phoneNumberId(), props.whatsapp().token(), builder);
     }
 
-    WhatsAppClient(String graphBaseUrl, String phoneNumberId, String token, WebClient.Builder builder) {
+    public WhatsAppClient(String graphBaseUrl, String phoneNumberId, String token, WebClient.Builder builder) {
         this.phoneNumberId = phoneNumberId;
         this.token = token;
         ExchangeStrategies large = ExchangeStrategies.builder()

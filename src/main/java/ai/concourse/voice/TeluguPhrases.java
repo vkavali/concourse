@@ -26,6 +26,15 @@ public final class TeluguPhrases {
     public static final String BTN_HELP = "సహాయం కావాలి";     // I need help
     public static final String BTN_SON = "కొడుకుకు చెప్పు";    // Tell my son
 
+    /** "Attention: your gate has changed. New gate: X. Again: gate X. Follow the boards that say gate X. See the card." */
+    public static String gateChanged(JourneyFacts.Flight f) {
+        if (f.gate() == null) {
+            return "గమనించండి: మీ విమానం " + f.flight() + " గేట్ మారింది. కొత్త గేట్ ఇంకా ప్రకటించలేదు. దయచేసి పెద్ద స్క్రీన్ చూడండి, లేదా ఈ కార్డును సిబ్బందికి చూపించండి.";
+        }
+        return "గమనించండి: మీ విమానం " + f.flight() + " గేట్ మారింది. కొత్త గేట్ " + f.gate() + ". "
+                + "మళ్ళీ చెబుతున్నాను: గేట్ " + f.gate() + ". గేట్ " + f.gate() + " అని రాసిన బోర్డులను అనుసరించండి. కార్డు చూడండి.";
+    }
+
     /** Gate answer from verified facts: known gate, or "not announced yet, look at the big screen / show the card". */
     public static String gateAnswer(JourneyFacts facts) {
         JourneyFacts.Flight f = facts == null ? null : facts.firstFlight();

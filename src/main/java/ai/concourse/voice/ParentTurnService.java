@@ -161,6 +161,27 @@ public class ParentTurnService {
         eventLog.record(journey.get().getId(), EventLog.ACTOR_PARENT, "button", Map.of("id", buttonId));
     }
 
+    /** A verified gate change reached the journey: card + voice to the parent, English text to the child. */
+    public void announceGateChange(JourneyEntity journey, int seq, String source) {
+        JourneyFacts facts = facts(journey);
+        JourneyFacts.Flight f = facts.flights().stream().filter(x -> x.seq() == seq).findFirst().orElse(facts.firstFlight());
+        if (f == null) return;
+        Optional<ContactEntity> parent = contactByHash(journey.getParentPhoneHash());
+        if (parent.isPresent()) {
+            String to = parent.get().getE164();
+            try {
+                channel.sendImage(to, cards.gateCard(f), "గేట్ మారింది · " + f.flight());
+            } catch (Exception e) {
+                log.warn("gate card not sent: {}", e.getMessage());
+            }
+            speak(to, TeluguPhrases.gateChanged(f), null, facts);
+        }
+        contactByHash(journey.getChildPhoneHash()).ifPresent(c -> channel.sendText(c.getE164(),
+                "Gate update for flight " + f.flight() + ": " + (f.gate() == null ? "gate cleared" : "gate " + f.gate())
+                        + " (source: " + source + "). " + (parent.isPresent() ? "She has the new card and a voice note." : "Traveler not registered yet.")));
+        eventLog.record(journey.getId(), EventLog.ACTOR_SYSTEM, "gate_change_announced", Map.of("seq", seq, "parent_notified", parent.isPresent()));
+    }
+
     // ---- pieces -----------------------------------------------------------------------------------------------
 
     ParentTurn interpret(String transcript, JourneyFacts facts) {

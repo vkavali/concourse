@@ -78,6 +78,19 @@ class JourneyServiceTest {
     }
 
     @Test
+    void verifiedFlightUpdateIsTheOnlyGateWriter() {
+        JourneyEntity j = journeys.createFromItinerary("child-hash-3", demoItinerary());
+        assertNull(journeys.segments(j.getId()).get(0).getGate());
+        FlightSegmentEntity updated = journeys.applyVerifiedFlightUpdate(j.getId(), 1, "b12", "demo operations event").orElseThrow();
+        assertEquals("B12", updated.getGate());
+        assertEquals("demo operations event", updated.getSource());
+        assertEquals("B12", journeys.segments(j.getId()).get(0).getGate());
+        assertTrue(journeys.applyVerifiedFlightUpdate(j.getId(), 9, "C1", "x").isEmpty(), "unknown segment");
+        List<EventEntity> log = events.findByJourneyIdOrderByTs(j.getId());
+        assertTrue(log.stream().anyMatch(e -> "gate_update".equals(e.getType()) && e.getSanitizedPayload().contains("B12")));
+    }
+
+    @Test
     void contactsDefaultToChildUntilRegistered() {
         assertEquals(ContactEntity.Role.CHILD, contacts.roleOf("919876543210"));
         contacts.register("+91 98765 43210", ContactEntity.Role.PARENT, "te");

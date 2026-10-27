@@ -102,6 +102,26 @@ public class JourneyService {
         return j;
     }
 
+    /**
+     * The only way a gate changes. Source is recorded ("demo operations event", "aeroapi", ...). Never called from
+     * parent input or sign photos.
+     */
+    @Transactional
+    public Optional<FlightSegmentEntity> applyVerifiedFlightUpdate(UUID journeyId, int seq, String newGate, String source) {
+        Optional<FlightSegmentEntity> seg = segments.findByJourneyIdOrderBySeq(journeyId).stream()
+                .filter(x -> x.getSeq() == seq).findFirst();
+        seg.ifPresent(x -> {
+            String old = x.getGate();
+            x.setGate(newGate == null || newGate.isBlank() ? null : newGate.strip().toUpperCase());
+            x.setSource(source);
+            x.setLastVerifiedAt(OffsetDateTime.now());
+            segments.save(x);
+            eventLog.record(journeyId, EventLog.ACTOR_OPS, "gate_update",
+                    Map.of("seq", seq, "from", old == null ? "" : old, "to", x.getGate() == null ? "" : x.getGate(), "source", source));
+        });
+        return seg;
+    }
+
     @Transactional(readOnly = true)
     public Optional<JourneyEntity> find(UUID id) {
         return journeys.findById(id);

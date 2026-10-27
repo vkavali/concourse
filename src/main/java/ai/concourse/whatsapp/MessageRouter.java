@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
 @Component
 public class MessageRouter implements InboundMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageRouter.class);
+    private static final Pattern GATE_CMD = Pattern.compile("^gate\\s+([A-Za-z]{1,2}\\s?-?\\d{1,3}[A-Za-z]?|none)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PHONE = Pattern.compile("^(?:parent|traveler|traveller|mom|amma|dad)?\\s*\\+?[\\d\\s().-]{8,20}$", Pattern.CASE_INSENSITIVE);
 
     private final MessagingChannel whatsApp;
@@ -137,6 +138,23 @@ public class MessageRouter implements InboundMessageHandler {
             log.info("say: {} chars → {} bytes in {} ms", raw.length() - 4, ogg.length, System.currentTimeMillis() - t0);
             return;
         }
+        java.util.regex.Matcher gate = GATE_CMD.matcher(raw);
+        if (gate.matches()) { // demo: a labeled simulated operations event — the only way a gate changes
+            Optional<JourneyEntity> j = journeys.latestForChild(hasher.hash(from));
+            if (j.isEmpty()) {
+                whatsApp.sendText(from, "No journey yet. Send the ticket first.");
+                return;
+            }
+            String newGate = gate.group(1).equalsIgnoreCase("none") ? null : gate.group(1).replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
+            String source = "demo operations event";
+            if (journeys.applyVerifiedFlightUpdate(j.get().getId(), 1, newGate, source).isEmpty()) {
+                whatsApp.sendText(from, "No flight segment to update.");
+                return;
+            }
+            whatsApp.sendText(from, "Simulated operations event applied: flight 1 gate → " + (newGate == null ? "cleared" : newGate) + ". Notifying both phones.");
+            parentTurns.announceGateChange(j.get(), 1, source);
+            return;
+        }
         if (PHONE.matcher(raw).matches() && PhoneHasher.normalize(raw).length() >= 10) {
             registerParent(from, PhoneHasher.normalize(raw));
             return;
@@ -156,7 +174,8 @@ public class MessageRouter implements InboundMessageHandler {
             return;
         }
         whatsApp.sendText(from, "Concourse: send the traveler's ticket (PDF or photo) and I will build the journey. "
-                + "Then send her WhatsApp number (e.g. +91 98765 43210). Type 'status' to see the current itinerary.");
+                + "Then send her WhatsApp number (e.g. +91 98765 43210). Type 'status' to see the current itinerary, "
+                + "or 'gate B12' to simulate a gate change (demo).");
     }
 
     private void registerParent(String childWaId, String parentDigits) {

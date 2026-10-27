@@ -183,6 +183,15 @@ class ParentTurnServiceTest {
     }
 
     @Test
+    void gateChangeReachesBothPhones() {
+        service.announceGateChange(journey, 1, "demo operations event");
+        verify(channel).sendImage(eq(PARENT), any(), contains("గేట్ మారింది"));
+        verify(channel).sendText(eq(PARENT), contains("కొత్త గేట్ B12"));
+        verify(channel).sendText(eq(CHILD), contains("gate B12"));
+        verify(channel).sendText(eq(CHILD), contains("demo operations event"));
+    }
+
+    @Test
     void voiceNoteGoesOutWhenTtsIsConfigured() {
         when(tts.isConfigured()).thenReturn(true);
         when(tts.synthesizeOggOpus(any())).thenReturn(new byte[]{9, 9});

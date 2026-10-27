@@ -114,6 +114,19 @@ class MessageRouterTest {
     }
 
     @Test
+    void gateCommandAppliesASimulatedOperationsEvent() {
+        JourneyEntity j = new JourneyEntity();
+        j.setId(java.util.UUID.randomUUID());
+        when(journeys.latestForChild(hasher.hash("17165550100"))).thenReturn(Optional.of(j));
+        when(journeys.applyVerifiedFlightUpdate(j.getId(), 1, "B12", "demo operations event"))
+                .thenReturn(Optional.of(new ai.concourse.journey.FlightSegmentEntity()));
+        router.handle(msg(InboundMessage.Type.TEXT, "gate b-12", null, null, null));
+        verify(journeys).applyVerifiedFlightUpdate(j.getId(), 1, "B12", "demo operations event");
+        verify(parentTurns).announceGateChange(j, 1, "demo operations event");
+        verify(whatsApp).sendText(eq("17165550100"), contains("gate → B12"));
+    }
+
+    @Test
     void failuresAreReportedNotSwallowed() {
         when(voiceNotes.transcribe("m4")).thenThrow(new RuntimeException("stt down"));
         router.handle(msg(InboundMessage.Type.AUDIO, null, "m4", "audio/ogg", null));

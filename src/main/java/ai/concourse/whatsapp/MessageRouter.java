@@ -8,6 +8,7 @@ import ai.concourse.journey.ContactService;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.stt.SttClient;
+import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.VoiceNoteService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,15 +33,17 @@ public class MessageRouter implements InboundMessageHandler {
     private final VoiceNoteService voiceNotes;
     private final JourneyService journeys;
     private final PhoneHasher hasher;
+    private final TtsClient tts;
 
     public MessageRouter(MessagingChannel whatsApp, ContactService contacts, TicketIngestService tickets,
-                         VoiceNoteService voiceNotes, JourneyService journeys, PhoneHasher hasher) {
+                         VoiceNoteService voiceNotes, JourneyService journeys, PhoneHasher hasher, TtsClient tts) {
         this.whatsApp = whatsApp;
         this.contacts = contacts;
         this.tickets = tickets;
         this.voiceNotes = voiceNotes;
         this.journeys = journeys;
         this.hasher = hasher;
+        this.tts = tts;
     }
 
     @Async
@@ -86,9 +89,22 @@ public class MessageRouter implements InboundMessageHandler {
     }
 
     private void handleText(String from, ContactEntity.Role role, String text) {
-        String t = text == null ? "" : text.strip().toLowerCase(Locale.ROOT);
+        String raw = text == null ? "" : text.strip();
+        String t = raw.toLowerCase(Locale.ROOT);
         if (role == ContactEntity.Role.PARENT) {
             whatsApp.sendText(from, "🎙"); // parents are never asked to type; Day 2 answers with a voice note
+            return;
+        }
+        if (t.startsWith("say ") && raw.length() > 4) {
+            // Dev/test command: "say <Telugu text>" → Telugu voice note (MMS-TTS on Modal). Used for the intelligibility test.
+            if (!tts.isConfigured()) {
+                whatsApp.sendText(from, "TTS is not configured (TTS_BASE_URL).");
+                return;
+            }
+            long t0 = System.currentTimeMillis();
+            byte[] ogg = tts.synthesizeOggOpus(raw.substring(4).strip());
+            whatsApp.sendVoiceNote(from, ogg);
+            log.info("say: {} chars → {} bytes in {} ms", raw.length() - 4, ogg.length, System.currentTimeMillis() - t0);
             return;
         }
         if (t.equals("status")) {

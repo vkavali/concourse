@@ -7,6 +7,7 @@ import ai.concourse.journey.ContactEntity;
 import ai.concourse.journey.ContactService;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.stt.SttClient;
+import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.VoiceNoteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ class MessageRouterTest {
     private final TicketIngestService tickets = mock(TicketIngestService.class);
     private final VoiceNoteService voiceNotes = mock(VoiceNoteService.class);
     private final JourneyService journeys = mock(JourneyService.class);
+    private final TtsClient tts = mock(TtsClient.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
     private MessageRouter router;
 
@@ -31,7 +33,7 @@ class MessageRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, journeys, hasher);
+        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, journeys, hasher, tts);
         when(contacts.roleOf(any())).thenReturn(ContactEntity.Role.CHILD);
     }
 
@@ -69,6 +71,14 @@ class MessageRouterTest {
         when(journeys.latestForChild(any())).thenReturn(Optional.empty());
         router.handle(msg(InboundMessage.Type.TEXT, "Status", null, null, null));
         verify(whatsApp).sendText(eq("17165550100"), contains("No journey yet"));
+    }
+
+    @Test
+    void sayCommandSendsATeluguVoiceNote() {
+        when(tts.isConfigured()).thenReturn(true);
+        when(tts.synthesizeOggOpus("నమస్కారం")).thenReturn(new byte[]{1, 2, 3});
+        router.handle(msg(InboundMessage.Type.TEXT, "say నమస్కారం", null, null, null));
+        verify(whatsApp).sendVoiceNote("17165550100", new byte[]{1, 2, 3});
     }
 
     @Test

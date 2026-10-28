@@ -9,8 +9,12 @@ import ai.concourse.journey.ContactEntity;
 import ai.concourse.journey.ContactService;
 import ai.concourse.journey.EventLog;
 import ai.concourse.journey.FlightSegmentEntity;
+import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
+import ai.concourse.journey.JourneyFacts;
 import ai.concourse.journey.JourneyService;
+import ai.concourse.journey.StageEntity;
+import ai.concourse.journey.StageType;
 import ai.concourse.safety.SafetyPolicy;
 import ai.concourse.spark.PromptLoader;
 import ai.concourse.spark.SparkClient;
@@ -44,18 +48,21 @@ class ParentTurnServiceTest {
     private final SparkClient spark = mock(SparkClient.class);
     private final TtsClient tts = mock(TtsClient.class);
     private final JourneyService journeys = mock(JourneyService.class);
+    private final JourneyController controller = mock(JourneyController.class);
     private final ContactService contacts = mock(ContactService.class);
     private final EventLog eventLog = mock(EventLog.class);
     private final ObjectMapper mapper = new ObjectMapper();
     private final CardRenderer cards = mock(CardRenderer.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
+    private ParentMessenger messenger;
     private ParentTurnService service;
     private JourneyEntity journey;
 
     @BeforeEach
     void setUp() {
-        service = new ParentTurnService(channel, transcoder, stt, spark, new PromptLoader(mapper), tts, new SafetyPolicy(),
-                journeys, contacts, new Airports(), hasher, eventLog, mapper, cards);
+        messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, contacts, journeys, new Airports());
+        service = new ParentTurnService(channel, transcoder, stt, spark, new PromptLoader(mapper), journeys, controller,
+                messenger, hasher, eventLog, mapper);
         when(cards.gateCard(any())).thenReturn(new byte[]{0x50, 0x4E, 0x47});
         journey = new JourneyEntity();
         journey.setId(UUID.randomUUID());
@@ -63,6 +70,7 @@ class ParentTurnServiceTest {
         journey.setPassengerFirstName("Lakshmi");
         journey.setChildPhoneHash(hasher.hash(CHILD));
         journey.setParentPhoneHash(hasher.hash(PARENT));
+        journey.setConsentAt(OffsetDateTime.now());
         FlightSegmentEntity seg = new FlightSegmentEntity();
         seg.setSeq(1);
         seg.setAirline("Qatar Airways");
@@ -83,11 +91,14 @@ class ParentTurnServiceTest {
         when(channel.downloadMedia("m1")).thenReturn(new byte[]{1});
         when(transcoder.toWav16kMono(any())).thenReturn(new byte[100]);
         when(tts.isConfigured()).thenReturn(false);
+        when(controller.current(any())).thenReturn(Optional.empty());
     }
 
     private void sparkReturns(ParentTurn turn) {
         when(spark.completeJson(any(SparkRequest.class), eq(ParentTurn.class), any(ObjectMapper.class))).thenReturn(turn);
     }
+
+    private JourneyFacts facts() { return messenger.facts(journey); }
 
     @Test
     void gateQuestionIsAnsweredFromVerifiedFactsNotTheModel() {
@@ -97,12 +108,13 @@ class ParentTurnServiceTest {
 
         service.handleVoiceNote(PARENT, "m1");
 
-        String expected = TeluguPhrases.gateAnswer(service_facts());
+        String expected = TeluguPhrases.gateAnswer(facts());
         assertTrue(expected.startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్ B12 నుండి"), expected);
         verify(channel).sendText(PARENT, expected);
         verify(channel, never()).sendText(PARENT, "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది.");
         verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
         verify(channel, never()).sendButtons(any(), any(), any());
+        verify(controller).onParentMessage(journey);
         ArgumentCaptor<SparkRequest> req = ArgumentCaptor.forClass(SparkRequest.class);
         verify(spark).completeJson(req.capture(), eq(ParentTurn.class), any(ObjectMapper.class));
         assertTrue(req.getValue().user().contains("transcript: నా గేట్ ఎక్కడ"));
@@ -122,6 +134,28 @@ class ParentTurnServiceTest {
 
         verify(channel).sendText(PARENT, "బ్యాగేజ్ కౌంటర్ దగ్గర ఈ కార్డును సిబ్బందికి చూపించండి.");
         verify(channel, never()).sendImage(any(), any(), any());
+    }
+
+    @Test
+    void journeyIntentsGoToTheController() {
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "నా ప్రయాణం మొదలు", 2000));
+        sparkReturns(new ParentTurn("START_TRIP", null, 0.93, "none", "సరే", "start my trip"));
+        service.handleVoiceNote(PARENT, "m1");
+        verify(controller).recordConsent(journey, "voice");
+
+        sparkReturns(new ParentTurn("I_AM_HERE", null, 0.93, "none", "సరే", "I am here"));
+        service.handleVoiceNote(PARENT, "m1");
+        verify(controller).markHere(journey, "voice");
+
+        sparkReturns(new ParentTurn("AT_COUNTER", null, 0.93, "acknowledge_stage", "సరే", "I am at the counter"));
+        service.handleVoiceNote(PARENT, "m1");
+        verify(controller).acknowledge(journey, "voice: I am at the counter");
+
+        when(controller.whatNext(journey)).thenReturn(StageText.ACK_THANKS);
+        sparkReturns(new ParentTurn("WHAT_NEXT", null, 0.93, "get_next_stage", "model text", "what next"));
+        service.handleVoiceNote(PARENT, "m1");
+        verify(channel).sendText(PARENT, StageText.ACK_THANKS);
+        verify(channel, never()).sendText(PARENT, "model text");
     }
 
     @Test
@@ -185,12 +219,19 @@ class ParentTurnServiceTest {
     void gateButtonSendsTheCardAndAnswersFromFactsOnly() {
         service.handleButton(PARENT, ParentTurnService.BTN_GATE);
         verify(channel).sendImage(eq(PARENT), eq(new byte[]{0x50, 0x4E, 0x47}), contains("గేట్ B12"));
-        verify(channel).sendText(PARENT, TeluguPhrases.gateAnswer(service_facts()));
+        verify(channel).sendText(PARENT, TeluguPhrases.gateAnswer(facts()));
         verifyNoInteractions(spark);
     }
 
-    private ai.concourse.journey.JourneyFacts service_facts() {
-        return ai.concourse.journey.JourneyFacts.of(journey, journeys.segments(journey.getId()), new Airports());
+    @Test
+    void stageButtonsGoToTheController() {
+        service.handleButton(PARENT, StageText.BTN_START);
+        verify(controller).recordConsent(journey, "button");
+        service.handleButton(PARENT, StageText.BTN_DONE);
+        verify(controller).acknowledge(journey, "button");
+        service.handleButton(PARENT, StageText.BTN_HERE);
+        verify(controller).markHere(journey, "button");
+        verifyNoInteractions(spark);
     }
 
     @Test
@@ -211,12 +252,19 @@ class ParentTurnServiceTest {
     }
 
     @Test
-    void gateChangeReachesBothPhones() {
-        service.announceGateChange(journey, 1, "demo operations event");
-        verify(channel).sendImage(eq(PARENT), any(), contains("గేట్ మారింది"));
-        verify(channel).sendText(eq(PARENT), contains("కొత్త గేట్ B12"));
-        verify(channel).sendText(eq(CHILD), contains("gate B12"));
-        verify(channel).sendText(eq(CHILD), contains("demo operations event"));
+    void whatNextDuringAGateStageBringsTheCard() {
+        StageEntity current = new StageEntity();
+        current.setType(StageType.WAITING_AT_ORIGIN.name());
+        current.setSegmentSeq(1);
+        when(controller.current(journey)).thenReturn(Optional.of(current));
+        when(controller.whatNext(journey)).thenReturn("గేట్ B12 కి వెళ్ళండి.");
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "ఇప్పుడు ఏం చేయాలి", 2000));
+        sparkReturns(new ParentTurn("WHAT_NEXT", null, 0.9, "get_next_stage", "x", "what now"));
+
+        service.handleVoiceNote(PARENT, "m1");
+
+        verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
+        verify(channel).sendButtons(eq(PARENT), eq("గేట్ B12 కి వెళ్ళండి."), any());
     }
 
     @Test

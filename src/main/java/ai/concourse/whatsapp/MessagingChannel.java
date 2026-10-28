@@ -17,6 +17,9 @@ public interface MessagingChannel {
 
     String sendImage(String to, byte[] png, String caption);
 
+    /** An approved template (the only thing WhatsApp lets through outside the 24-hour window). */
+    String sendTemplate(String to, String templateName, String languageCode, List<String> bodyParams);
+
     /** Inbound media id → bytes. */
     byte[] downloadMedia(String mediaId);
 }

@@ -44,8 +44,8 @@ public class ItineraryValidator {
     private final Clock clock;
 
     @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
-    public ItineraryValidator(Airports airports, ConcourseProperties props) {
-        this(airports, props.itinerary().allowPastDates(), props.itinerary().maxDaysAhead(), Clock.systemUTC());
+    public ItineraryValidator(Airports airports, ConcourseProperties props, Clock clock) {
+        this(airports, props.itinerary().allowPastDates(), props.itinerary().maxDaysAhead(), clock);
     }
 
     public ItineraryValidator(Airports airports, boolean allowPastDates, int maxDaysAhead, Clock clock) {

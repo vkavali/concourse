@@ -47,6 +47,18 @@ public class JourneyEntity implements Persistable<UUID> {
     @Column(name = "itinerary_confirmed_at")
     private OffsetDateTime itineraryConfirmedAt;
 
+    /** When the parent got the intro + consent request (sent once both the itinerary is confirmed and she is registered). */
+    @Column(name = "intro_sent_at")
+    private OffsetDateTime introSentAt;
+
+    /** Last inbound message from the parent — the WhatsApp 24-hour free-form window is measured from this. */
+    @Column(name = "last_parent_message_at")
+    private OffsetDateTime lastParentMessageAt;
+
+    /** The stage most recently pushed to the parent. */
+    @Column(name = "current_stage_id")
+    private UUID currentStageId;
+
     /** Ids are assigned by code, so Spring Data cannot infer "new" from a null id; without this it would merge() (SELECT + copy) instead of persist(). */
     @Transient
     private boolean isNew = true;
@@ -85,6 +97,12 @@ public class JourneyEntity implements Persistable<UUID> {
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public String getPassengerFirstName() { return passengerFirstName; }
     public void setPassengerFirstName(String passengerFirstName) { this.passengerFirstName = passengerFirstName; }
+    public OffsetDateTime getIntroSentAt() { return introSentAt; }
+    public void setIntroSentAt(OffsetDateTime introSentAt) { this.introSentAt = introSentAt; }
+    public OffsetDateTime getLastParentMessageAt() { return lastParentMessageAt; }
+    public void setLastParentMessageAt(OffsetDateTime lastParentMessageAt) { this.lastParentMessageAt = lastParentMessageAt; }
+    public UUID getCurrentStageId() { return currentStageId; }
+    public void setCurrentStageId(UUID currentStageId) { this.currentStageId = currentStageId; }
     public OffsetDateTime getItineraryConfirmedAt() { return itineraryConfirmedAt; }
     public void setItineraryConfirmedAt(OffsetDateTime itineraryConfirmedAt) { this.itineraryConfirmedAt = itineraryConfirmedAt; }
 }

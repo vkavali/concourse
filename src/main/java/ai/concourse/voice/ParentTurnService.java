@@ -1,21 +1,18 @@
 package ai.concourse.voice;
 
 import ai.concourse.audio.AudioTranscoder;
-import ai.concourse.card.CardRenderer;
 import ai.concourse.common.PhoneHasher;
-import ai.concourse.itinerary.Airports;
-import ai.concourse.journey.ContactEntity;
-import ai.concourse.journey.ContactService;
 import ai.concourse.journey.EventLog;
+import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyFacts;
 import ai.concourse.journey.JourneyService;
+import ai.concourse.journey.StageType;
 import ai.concourse.safety.SafetyPolicy;
 import ai.concourse.spark.PromptLoader;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
 import ai.concourse.stt.SttClient;
-import ai.concourse.tts.TtsClient;
 import ai.concourse.whatsapp.MessagingChannel;
 import ai.concourse.whatsapp.WhatsAppClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +29,8 @@ import java.util.Optional;
  * One parent turn: voice note → transcript → Spark interpretation → code decides → Telugu voice note back.
  * <p>
  * Spark proposes {intent, confidence, tool, reply}; this class owns what actually happens: the confidence gate,
- * the safety check, tool execution, and sending. Every reply (model-written or templated) passes {@link SafetyPolicy}.
+ * the safety check, tool execution, and sending. The journey-changing intents (start my trip, done, I'm here,
+ * what next, where is the gate) are answered by {@link JourneyController} and templates, never by model prose.
  * Timings per hop are logged on one line so the < 10 s gate can be measured.
  */
 @Service
@@ -52,31 +50,24 @@ public class ParentTurnService {
     private final SttClient stt;
     private final SparkClient spark;
     private final PromptLoader prompts;
-    private final TtsClient tts;
-    private final SafetyPolicy safety;
     private final JourneyService journeys;
-    private final ContactService contacts;
-    private final Airports airports;
+    private final JourneyController controller;
+    private final ParentMessenger messenger;
     private final PhoneHasher hasher;
     private final EventLog eventLog;
     private final ObjectMapper mapper;
-    private final CardRenderer cards;
 
     public ParentTurnService(MessagingChannel channel, AudioTranscoder transcoder, SttClient stt, SparkClient spark,
-                             PromptLoader prompts, TtsClient tts, SafetyPolicy safety, JourneyService journeys,
-                             ContactService contacts, Airports airports, PhoneHasher hasher, EventLog eventLog,
-                             ObjectMapper mapper, CardRenderer cards) {
-        this.cards = cards;
+                             PromptLoader prompts, JourneyService journeys, JourneyController controller,
+                             ParentMessenger messenger, PhoneHasher hasher, EventLog eventLog, ObjectMapper mapper) {
         this.channel = channel;
         this.transcoder = transcoder;
         this.stt = stt;
         this.spark = spark;
         this.prompts = prompts;
-        this.tts = tts;
-        this.safety = safety;
         this.journeys = journeys;
-        this.contacts = contacts;
-        this.airports = airports;
+        this.controller = controller;
+        this.messenger = messenger;
         this.hasher = hasher;
         this.eventLog = eventLog;
         this.mapper = mapper;
@@ -87,10 +78,12 @@ public class ParentTurnService {
         long t0 = System.currentTimeMillis();
         Optional<JourneyEntity> journey = journeys.latestForParent(hasher.hash(parentWaId));
         if (journey.isEmpty()) {
-            speak(parentWaId, TeluguPhrases.NOT_SET_UP, null, null);
+            messenger.speak(parentWaId, TeluguPhrases.NOT_SET_UP, null, null);
             return;
         }
-        JourneyFacts facts = facts(journey.get());
+        JourneyEntity j = journey.get();
+        controller.onParentMessage(j);
+        JourneyFacts facts = messenger.facts(j);
 
         byte[] ogg = channel.downloadMedia(mediaId);
         long t1 = System.currentTimeMillis();
@@ -111,78 +104,86 @@ public class ParentTurnService {
         if (turn == null || turn.needsClarification()) {
             event.put("outcome", "clarify");
             if (turn != null) { event.put("intent", turn.intent()); event.put("confidence", turn.confidence()); }
-            speak(parentWaId, TeluguPhrases.CLARIFY, PARENT_BUTTONS, facts);
+            messenger.speak(parentWaId, TeluguPhrases.CLARIFY, PARENT_BUTTONS, facts);
         } else {
             event.put("intent", turn.intent());
             event.put("confidence", turn.confidence());
             event.put("tool", turn.toolProposal());
-            // Spark classifies the intent; the gate itself is answered by a fixed template from verified facts, so the
-            // most important sentence of the journey never depends on model prose (or on how a model spells a code).
-            boolean gateQuestion = "WHERE_IS_GATE".equals(turn.intent()) || "WHAT_NEXT".equals(turn.intent());
-            String reply = gateQuestion ? TeluguPhrases.gateAnswer(facts) : turn.replyTe();
-            SafetyPolicy.Result checked = safety.check(reply, facts);
-            if (!checked.ok()) {
-                event.put("safety_violations", checked.violations());
-                notifyChild(journey.get(), "safety fallback: " + String.join("; ", checked.violations()), turn.englishGloss());
-            }
-            executeTool(turn, journey.get(), facts, parentWaId);
-            if (gateQuestion) sendGateCard(parentWaId, facts);
-            speak(parentWaId, checked.text(), null, facts);
-            event.put("outcome", checked.ok() ? "replied" : "fallback");
+            event.put("outcome", respond(j, facts, parentWaId, turn));
         }
         long t5 = System.currentTimeMillis();
         event.put("ms", Map.of("download", t1 - t0, "ffmpeg", t2 - t1, "stt", t3 - t2, "spark", t4 - t3, "tts_send", t5 - t4, "total", t5 - t0));
-        eventLog.record(journey.get().getId(), EventLog.ACTOR_PARENT, "voice_turn", event);
+        eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "voice_turn", event);
         log.info("parent turn {} ms (dl {} / ffmpeg {} / stt {} / spark {} / tts+send {}) outcome={}",
                 t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, event.get("outcome"));
     }
 
-    /** Parent tapped one of the three buttons. Templated answers only — no model. */
+    /** Spark classified the intent; code answers. Returns the outcome label for the event log. */
+    private String respond(JourneyEntity j, JourneyFacts facts, String parentWaId, ParentTurn turn) {
+        switch (turn.intent()) {
+            case "START_TRIP" -> { controller.recordConsent(j, "voice"); return "consent"; }
+            case "I_AM_HERE" -> { controller.markHere(j, "voice"); return "here"; }
+            case "AT_COUNTER" -> { controller.acknowledge(j, "voice: " + turn.englishGloss()); return "ack"; }
+            case "WHAT_NEXT" -> {
+                String text = controller.whatNext(j);
+                if (j.getConsentAt() == null) {
+                    messenger.speak(parentWaId, text, StageText.buttons(StageType.PRE_TRIP), facts);
+                } else {
+                    StageType current = controller.current(j).map(s -> s.stageType()).orElse(StageType.PRE_TRIP);
+                    if (current.showsGateCard()) messenger.sendGateCard(parentWaId, facts, controller.current(j).map(s -> s.getSegmentSeq()).orElse(null));
+                    messenger.speak(parentWaId, text, StageText.buttons(current), facts);
+                }
+                return "what_next";
+            }
+            case "WHERE_IS_GATE" -> {
+                messenger.sendGateCard(parentWaId, facts);
+                messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+                return "gate";
+            }
+            default -> {
+                SafetyPolicy.Result checked = messenger.check(turn.replyTe(), facts);
+                if (!checked.ok()) {
+                    messenger.notifyChild(j, "safety fallback: " + String.join("; ", checked.violations()), turn.englishGloss());
+                }
+                executeTool(turn, j, facts, parentWaId);
+                messenger.speak(parentWaId, checked.text(), null, facts);
+                return checked.ok() ? "replied" : "fallback";
+            }
+        }
+    }
+
+    /** Parent tapped a button. Templated answers only — no model. */
     public void handleButton(String parentWaId, String buttonId) {
         Optional<JourneyEntity> journey = journeys.latestForParent(hasher.hash(parentWaId));
         if (journey.isEmpty()) {
-            speak(parentWaId, TeluguPhrases.NOT_SET_UP, null, null);
+            messenger.speak(parentWaId, TeluguPhrases.NOT_SET_UP, null, null);
             return;
         }
-        JourneyFacts facts = facts(journey.get());
+        JourneyEntity j = journey.get();
+        JourneyFacts facts = messenger.facts(j);
         switch (buttonId) {
+            case StageText.BTN_START -> controller.recordConsent(j, "button");
+            case StageText.BTN_DONE -> controller.acknowledge(j, "button");
+            case StageText.BTN_HERE -> controller.markHere(j, "button");
             case BTN_GATE -> {
-                sendGateCard(parentWaId, facts);
-                speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+                controller.onParentMessage(j);
+                messenger.sendGateCard(parentWaId, facts);
+                messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
             }
             case BTN_HELP -> {
-                notifyChild(journey.get(), "pressed HELP", null);
-                channel.sendText(parentWaId, staffCard(journey.get(), facts));
-                speak(parentWaId, TeluguPhrases.SHOW_CARD + " " + TeluguPhrases.SON_TOLD, null, facts);
+                controller.onParentMessage(j);
+                messenger.notifyChild(j, "pressed HELP", null);
+                channel.sendText(parentWaId, messenger.staffCard(j, facts));
+                messenger.speak(parentWaId, TeluguPhrases.SHOW_CARD + " " + TeluguPhrases.SON_TOLD, null, facts);
             }
             case BTN_SON -> {
-                notifyChild(journey.get(), "asked you to call", null);
-                speak(parentWaId, TeluguPhrases.SON_TOLD, null, facts);
+                controller.onParentMessage(j);
+                messenger.notifyChild(j, "asked you to call", null);
+                messenger.speak(parentWaId, TeluguPhrases.SON_TOLD, null, facts);
             }
             default -> log.info("unknown parent button {}", buttonId);
         }
-        eventLog.record(journey.get().getId(), EventLog.ACTOR_PARENT, "button", Map.of("id", buttonId));
-    }
-
-    /** A verified gate change reached the journey: card + voice to the parent, English text to the child. */
-    public void announceGateChange(JourneyEntity journey, int seq, String source) {
-        JourneyFacts facts = facts(journey);
-        JourneyFacts.Flight f = facts.flights().stream().filter(x -> x.seq() == seq).findFirst().orElse(facts.firstFlight());
-        if (f == null) return;
-        Optional<ContactEntity> parent = contactByHash(journey.getParentPhoneHash());
-        if (parent.isPresent()) {
-            String to = parent.get().getE164();
-            try {
-                channel.sendImage(to, cards.gateCard(f), "గేట్ మారింది · " + f.flight());
-            } catch (Exception e) {
-                log.warn("gate card not sent: {}", e.getMessage());
-            }
-            speak(to, TeluguPhrases.gateChanged(f), null, facts);
-        }
-        contactByHash(journey.getChildPhoneHash()).ifPresent(c -> channel.sendText(c.getE164(),
-                "Gate update for flight " + f.flight() + ": " + (f.gate() == null ? "gate cleared" : "gate " + f.gate())
-                        + " (source: " + source + "). " + (parent.isPresent() ? "She has the new card and a voice note." : "Traveler not registered yet.")));
-        eventLog.record(journey.getId(), EventLog.ACTOR_SYSTEM, "gate_change_announced", Map.of("seq", seq, "parent_notified", parent.isPresent()));
+        eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "button", Map.of("id", buttonId));
     }
 
     // ---- pieces -----------------------------------------------------------------------------------------------
@@ -199,73 +200,19 @@ public class ParentTurnService {
         return spark.completeJson(req, ParentTurn.class, mapper);
     }
 
+    /** Executes the tool Spark proposed — only the two a parent may trigger; the rest is the controller's business. */
     private void executeTool(ParentTurn turn, JourneyEntity journey, JourneyFacts facts, String parentWaId) {
         String tool = turn.toolProposal() == null ? "none" : turn.toolProposal();
         switch (tool) {
-            case "request_family_help" -> notifyChild(journey, "asked for help", turn.englishGloss());
-            case "create_staff_card" -> channel.sendText(parentWaId, staffCard(journey, facts));
-            default -> { /* get_next_stage / acknowledge_stage: the state machine arrives on Day 3; the reply already carries the next verified step */ }
+            case "request_family_help" -> messenger.notifyChild(journey, "asked for help", turn.englishGloss());
+            case "create_staff_card" -> channel.sendText(parentWaId, messenger.staffCard(journey, facts));
+            case "acknowledge_stage" -> controller.acknowledge(journey, "voice: " + turn.englishGloss());
+            default -> { /* get_next_stage / none: the reply already carries the next verified step */ }
         }
     }
 
-    /** The gate card: verified facts only, large print, Telugu + English. Sent before the voice so it is on screen while she listens. */
-    private void sendGateCard(String to, JourneyFacts facts) {
-        JourneyFacts.Flight f = facts == null ? null : facts.firstFlight();
-        if (f == null) return;
-        try {
-            String caption = f.gate() == null ? "గేట్ ఇంకా ప్రకటించలేదు · " + f.flight() : "గేట్ " + f.gate() + " · " + f.flight();
-            channel.sendImage(to, cards.gateCard(f), caption);
-        } catch (Exception e) {
-            log.warn("gate card not sent: {}", e.getMessage());
-        }
-    }
-
-    /** Voice note first (the thing she can use), then the same text and optional buttons. */
-    private void speak(String to, String textTe, List<WhatsAppClient.Button> buttons, JourneyFacts facts) {
-        SafetyPolicy.Result checked = safety.check(textTe, facts);
-        String text = checked.text();
-        if (tts.isConfigured()) {
-            try {
-                Map<String, String> names = Airlines.spokenNames(facts == null ? null : facts.flights());
-                channel.sendVoiceNote(to, tts.synthesizeOggOpus(TeluguSpeech.spokenForm(text, names)));
-            } catch (Exception e) {
-                log.warn("tts failed, sending text only: {}", e.getMessage());
-            }
-        }
-        if (buttons != null && !buttons.isEmpty()) channel.sendButtons(to, text, buttons);
-        else channel.sendText(to, text);
-    }
-
-    private void notifyChild(JourneyEntity journey, String what, String gloss) {
-        Optional<ContactEntity> child = contactByHash(journey.getChildPhoneHash());
-        if (child.isEmpty()) return;
-        String parentNumber = contactByHash(journey.getParentPhoneHash()).map(c -> "+" + c.getE164()).orElse("her number");
-        String msg = "Concourse: the traveler " + what + (gloss == null || gloss.isBlank() ? "" : " — she said: \"" + gloss + "\"")
-                + ".\nLast confirmed stage: " + journey.getStatus() + ". I do not know her physical location.\nCall her: " + parentNumber;
-        channel.sendText(child.get().getE164(), msg);
-    }
-
-    /** English card the parent shows to staff. Verified facts only. */
+    /** English card the parent shows to staff (kept here for tests and the router). */
     String staffCard(JourneyEntity journey, JourneyFacts facts) {
-        JourneyFacts.Flight f = facts.firstFlight();
-        String son = contactByHash(journey.getChildPhoneHash()).map(c -> "+" + c.getE164()).orElse("(not set)");
-        StringBuilder sb = new StringBuilder("PLEASE HELP — I speak Telugu, not English.\n");
-        if (journey.getPassengerFirstName() != null) sb.append("Traveler: ").append(journey.getPassengerFirstName()).append('\n');
-        if (f != null) {
-            sb.append("Flight ").append(f.flight()).append(" to ").append(f.to()).append(", departs ").append(f.departureLocal()).append('\n');
-            sb.append(f.gate() != null ? "Gate " + f.gate() : "Gate: not yet assigned");
-            if (f.terminal() != null) sb.append(" · Terminal ").append(f.terminal());
-            sb.append('\n');
-        }
-        sb.append("Family contact (WhatsApp): ").append(son);
-        return sb.toString();
-    }
-
-    private JourneyFacts facts(JourneyEntity j) {
-        return JourneyFacts.of(j, journeys.segments(j.getId()), airports);
-    }
-
-    private Optional<ContactEntity> contactByHash(String hash) {
-        return hash == null ? Optional.empty() : contacts.findByHash(hash);
+        return messenger.staffCard(journey, facts);
     }
 }

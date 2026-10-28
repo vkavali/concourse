@@ -122,6 +122,16 @@ public class JourneyService {
         return seg;
     }
 
+    @Transactional
+    public JourneyEntity save(JourneyEntity j) {
+        return journeys.save(j);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<JourneyEntity> latest() {
+        return journeys.findFirstByOrderByCreatedAtDesc();
+    }
+
     @Transactional(readOnly = true)
     public Optional<JourneyEntity> find(UUID id) {
         return journeys.findById(id);

@@ -8,4 +8,5 @@ import java.util.UUID;
 public interface JourneyRepository extends JpaRepository<JourneyEntity, UUID> {
     Optional<JourneyEntity> findFirstByChildPhoneHashOrderByCreatedAtDesc(String childPhoneHash);
     Optional<JourneyEntity> findFirstByParentPhoneHashAndStatusNotOrderByCreatedAtDesc(String parentPhoneHash, String status);
+    Optional<JourneyEntity> findFirstByOrderByCreatedAtDesc();
 }

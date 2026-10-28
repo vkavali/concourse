@@ -2,6 +2,7 @@ package ai.concourse.itinerary;
 
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.journey.EventLog;
+import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.whatsapp.MessagingChannel;
@@ -32,15 +33,17 @@ public class TicketIngestService {
     private final JourneyService journeys;
     private final PhoneHasher hasher;
     private final EventLog eventLog;
+    private final JourneyController controller;
 
     public TicketIngestService(MessagingChannel whatsApp, TicketExtractor extractor, ItineraryValidator validator,
-                               JourneyService journeys, PhoneHasher hasher, EventLog eventLog) {
+                               JourneyService journeys, PhoneHasher hasher, EventLog eventLog, JourneyController controller) {
         this.whatsApp = whatsApp;
         this.extractor = extractor;
         this.validator = validator;
         this.journeys = journeys;
         this.hasher = hasher;
         this.eventLog = eventLog;
+        this.controller = controller;
     }
 
     public void ingest(String fromWaId, String mediaId, String mimeType, String filename) {
@@ -74,8 +77,13 @@ public class TicketIngestService {
             whatsApp.sendText(fromWaId, "I could not find that itinerary. Please send the ticket again.");
             return;
         }
-        whatsApp.sendText(fromWaId, "Confirmed. Next: tell me the traveler's WhatsApp number so I can send her the first voice note.");
+        if (j.get().getParentPhoneHash() == null) {
+            whatsApp.sendText(fromWaId, "Confirmed. Next: tell me the traveler's WhatsApp number so I can send her the first voice note.");
+        } else {
+            whatsApp.sendText(fromWaId, "Confirmed. Sending her the intro now.");
+        }
         log.info("journey {} confirmed", journeyId);
+        controller.onJourneyReady(j.get().getId());
     }
 
     public void fix(String fromWaId, String journeyId) {

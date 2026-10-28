@@ -3,6 +3,7 @@ package ai.concourse.itinerary;
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.config.ConcourseProperties;
 import ai.concourse.journey.EventLog;
+import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.whatsapp.WhatsAppClient;
@@ -26,6 +27,7 @@ class TicketIngestServiceTest {
     private final TicketExtractor extractor = mock(TicketExtractor.class);
     private final JourneyService journeys = mock(JourneyService.class);
     private final EventLog eventLog = mock(EventLog.class);
+    private final JourneyController controller = mock(JourneyController.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
     private TicketIngestService service;
 
@@ -33,7 +35,7 @@ class TicketIngestServiceTest {
     void setUp() {
         ItineraryValidator validator = new ItineraryValidator(new Airports(), false, 60,
                 Clock.fixed(Instant.parse("2026-11-01T00:00:00Z"), ZoneOffset.UTC));
-        service = new TicketIngestService(whatsApp, extractor, validator, journeys, hasher, eventLog);
+        service = new TicketIngestService(whatsApp, extractor, validator, journeys, hasher, eventLog, controller);
         when(extractor.supports("application/pdf")).thenReturn(true);
         when(extractor.supports("image/jpeg")).thenReturn(true);
         when(whatsApp.downloadMedia("m1")).thenReturn(new byte[]{1, 2, 3});

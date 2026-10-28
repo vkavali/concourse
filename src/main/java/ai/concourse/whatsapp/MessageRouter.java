@@ -5,8 +5,10 @@ import ai.concourse.itinerary.ItinerarySummary;
 import ai.concourse.itinerary.TicketIngestService;
 import ai.concourse.journey.ContactEntity;
 import ai.concourse.journey.ContactService;
+import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
+import ai.concourse.journey.StageEntity;
 import ai.concourse.stt.SttClient;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.ParentTurnService;
@@ -32,7 +34,8 @@ import java.util.regex.Pattern;
 @Component
 public class MessageRouter implements InboundMessageHandler {
     private static final Logger log = LoggerFactory.getLogger(MessageRouter.class);
-    private static final Pattern GATE_CMD = Pattern.compile("^gate\\s+([A-Za-z]{1,2}\\s?-?\\d{1,3}[A-Za-z]?|none)$", Pattern.CASE_INSENSITIVE);
+    /** "gate B12", "gate none", "gate 2 C7" (second flight). */
+    private static final Pattern GATE_CMD = Pattern.compile("^gate\\s+(?:(\\d)\\s+)?([A-Za-z]{1,2}\\s?-?\\d{1,3}[A-Za-z]?|none)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern PHONE = Pattern.compile("^(?:parent|traveler|traveller|mom|amma|dad)?\\s*\\+?[\\d\\s().-]{8,20}$", Pattern.CASE_INSENSITIVE);
 
     private final MessagingChannel whatsApp;
@@ -41,18 +44,20 @@ public class MessageRouter implements InboundMessageHandler {
     private final VoiceNoteService voiceNotes;
     private final ParentTurnService parentTurns;
     private final JourneyService journeys;
+    private final JourneyController controller;
     private final PhoneHasher hasher;
     private final TtsClient tts;
 
     public MessageRouter(MessagingChannel whatsApp, ContactService contacts, TicketIngestService tickets,
                          VoiceNoteService voiceNotes, ParentTurnService parentTurns, JourneyService journeys,
-                         PhoneHasher hasher, TtsClient tts) {
+                         JourneyController controller, PhoneHasher hasher, TtsClient tts) {
         this.whatsApp = whatsApp;
         this.contacts = contacts;
         this.tickets = tickets;
         this.voiceNotes = voiceNotes;
         this.parentTurns = parentTurns;
         this.journeys = journeys;
+        this.controller = controller;
         this.hasher = hasher;
         this.tts = tts;
     }
@@ -118,12 +123,36 @@ public class MessageRouter implements InboundMessageHandler {
             return;
         }
         if (t.equals("mode parent")) { // dev: one phone plays both roles
-            if (journeys.attachParent(hasher.hash(from), hasher.hash(from)).isEmpty()) {
+            Optional<JourneyEntity> j = journeys.attachParent(hasher.hash(from), hasher.hash(from));
+            if (j.isEmpty()) {
                 whatsApp.sendText(from, "No journey yet — send the ticket first, then 'mode parent'.");
                 return;
             }
             contacts.register(from, ContactEntity.Role.PARENT, "te");
             whatsApp.sendText(from, "This number is now the traveler. Send a Telugu voice note. Type 'mode child' to switch back.");
+            controller.onJourneyReady(j.get().getId());
+            return;
+        }
+        if (t.equals("next") || t.equals("plan") || t.startsWith("clock")) { // demo controls
+            Optional<JourneyEntity> j = journeys.latestForChild(hasher.hash(from));
+            if (j.isEmpty()) {
+                whatsApp.sendText(from, "No journey yet. Send the ticket first.");
+                return;
+            }
+            if (t.equals("plan")) {
+                whatsApp.sendText(from, controller.describePlan(j.get()));
+            } else if (t.equals("next")) {
+                Optional<StageEntity> fired = controller.fireNext(j.get());
+                whatsApp.sendText(from, fired.map(st -> "Clock moved to its time; stage " + st.getSeq() + " " + st.getType() + " pushed to her.")
+                        .orElse(j.get().getConsentAt() == null
+                                ? "She has not said 'start my trip' yet — nothing is pushed until she does (switch to 'mode parent' and tap the button or say it)."
+                                : "No planned stage left to fire."));
+            } else {
+                if (t.equals("clock reset")) controller.clock().reset();
+                whatsApp.sendText(from, controller.clock().isTravelling()
+                        ? "Simulated clock: " + controller.clock().now() + " (offset " + controller.clock().offset().toMinutes() + " min). 'clock reset' returns to real time."
+                        : "Clock: real time (" + controller.clock().now() + "). 'next' jumps to the next planned stage.");
+            }
             return;
         }
         if (t.startsWith("say ") && raw.length() > 4) {
@@ -145,14 +174,12 @@ public class MessageRouter implements InboundMessageHandler {
                 whatsApp.sendText(from, "No journey yet. Send the ticket first.");
                 return;
             }
-            String newGate = gate.group(1).equalsIgnoreCase("none") ? null : gate.group(1).replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
-            String source = "demo operations event";
-            if (journeys.applyVerifiedFlightUpdate(j.get().getId(), 1, newGate, source).isEmpty()) {
-                whatsApp.sendText(from, "No flight segment to update.");
-                return;
+            String newGate = gate.group(2).equalsIgnoreCase("none") ? null : gate.group(2).replaceAll("[\\s-]", "").toUpperCase(Locale.ROOT);
+            int seg = gate.group(1) == null ? 1 : Integer.parseInt(gate.group(1));
+            whatsApp.sendText(from, "Simulated operations event: flight " + seg + " gate → " + (newGate == null ? "cleared" : newGate) + ". Notifying both phones.");
+            if (!controller.applyGateChange(j.get(), seg, newGate, JourneyController.DEMO_SOURCE)) {
+                whatsApp.sendText(from, "No flight segment " + seg + " to update.");
             }
-            whatsApp.sendText(from, "Simulated operations event applied: flight 1 gate → " + (newGate == null ? "cleared" : newGate) + ". Notifying both phones.");
-            parentTurns.announceGateChange(j.get(), 1, source);
             return;
         }
         if (PHONE.matcher(raw).matches() && PhoneHasher.normalize(raw).length() >= 10) {
@@ -167,15 +194,16 @@ public class MessageRouter implements InboundMessageHandler {
                 JourneyEntity je = j.get();
                 String confirmed = je.getItineraryConfirmedAt() == null ? "not confirmed yet" : "confirmed";
                 String parent = je.getParentPhoneHash() == null ? "traveler's number not set — send it to me" : "traveler registered";
+                String consent = je.getConsentAt() == null ? "not started (waiting for her 'start my trip')" : "started";
                 whatsApp.sendText(from, ItinerarySummary.forChild(je.getPassengerFirstName(), journeys.segments(je.getId()))
-                        + "\nStage: " + je.getStatus() + " (" + confirmed + "; " + parent + ")"
-                        + "\nI do not know her physical location — only the last stage she confirmed.");
+                        + "\nStage: " + je.getStatus() + " (" + confirmed + "; " + parent + "; " + consent + ")"
+                        + "\nI do not know her physical location — only the last stage she confirmed. Type 'plan' for the timeline.");
             }
             return;
         }
         whatsApp.sendText(from, "Concourse: send the traveler's ticket (PDF or photo) and I will build the journey. "
-                + "Then send her WhatsApp number (e.g. +91 98765 43210). Type 'status' to see the current itinerary, "
-                + "or 'gate B12' to simulate a gate change (demo).");
+                + "Then send her WhatsApp number (e.g. +91 98765 43210). Commands: 'status', 'plan', 'next' (fire the next stage now), "
+                + "'gate B12' (simulated gate change), 'clock reset'.");
     }
 
     private void registerParent(String childWaId, String parentDigits) {
@@ -187,5 +215,6 @@ public class MessageRouter implements InboundMessageHandler {
         contacts.register(parentDigits, ContactEntity.Role.PARENT, "te");
         whatsApp.sendText(childWaId, "Registered +" + parentDigits + " as the traveler. She can send Telugu voice notes to this number now."
                 + " (Test number: she must also be a verified recipient in the Meta console.)");
+        controller.onJourneyReady(j.get().getId());
     }
 }

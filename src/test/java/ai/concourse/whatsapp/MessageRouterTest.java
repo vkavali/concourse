@@ -5,6 +5,7 @@ import ai.concourse.config.ConcourseProperties;
 import ai.concourse.itinerary.TicketIngestService;
 import ai.concourse.journey.ContactEntity;
 import ai.concourse.journey.ContactService;
+import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.stt.SttClient;
@@ -27,6 +28,7 @@ class MessageRouterTest {
     private final JourneyService journeys = mock(JourneyService.class);
     private final TtsClient tts = mock(TtsClient.class);
     private final ParentTurnService parentTurns = mock(ParentTurnService.class);
+    private final JourneyController controller = mock(JourneyController.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
     private MessageRouter router;
 
@@ -36,7 +38,7 @@ class MessageRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, parentTurns, journeys, hasher, tts);
+        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, parentTurns, journeys, controller, hasher, tts);
         when(contacts.roleOf(any())).thenReturn(ContactEntity.Role.CHILD);
     }
 
@@ -118,12 +120,35 @@ class MessageRouterTest {
         JourneyEntity j = new JourneyEntity();
         j.setId(java.util.UUID.randomUUID());
         when(journeys.latestForChild(hasher.hash("17165550100"))).thenReturn(Optional.of(j));
-        when(journeys.applyVerifiedFlightUpdate(j.getId(), 1, "B12", "demo operations event"))
-                .thenReturn(Optional.of(new ai.concourse.journey.FlightSegmentEntity()));
+        when(controller.applyGateChange(j, 1, "B12", JourneyController.DEMO_SOURCE)).thenReturn(true);
         router.handle(msg(InboundMessage.Type.TEXT, "gate b-12", null, null, null));
-        verify(journeys).applyVerifiedFlightUpdate(j.getId(), 1, "B12", "demo operations event");
-        verify(parentTurns).announceGateChange(j, 1, "demo operations event");
+        verify(controller).applyGateChange(j, 1, "B12", JourneyController.DEMO_SOURCE);
         verify(whatsApp).sendText(eq("17165550100"), contains("gate → B12"));
+        router.handle(msg(InboundMessage.Type.TEXT, "gate 2 C7", null, null, null));
+        verify(controller).applyGateChange(j, 2, "C7", JourneyController.DEMO_SOURCE);
+    }
+
+    @Test
+    void registeringTheTravelerHandsTheJourneyToTheController() {
+        JourneyEntity j = new JourneyEntity();
+        j.setId(java.util.UUID.randomUUID());
+        when(journeys.attachParent(any(), any())).thenReturn(Optional.of(j));
+        router.handle(msg(InboundMessage.Type.TEXT, "mode parent", null, null, null));
+        verify(contacts).register("17165550100", ContactEntity.Role.PARENT, "te");
+        verify(controller).onJourneyReady(j.getId());
+    }
+
+    @Test
+    void demoControlsDriveTheClock() {
+        JourneyEntity j = new JourneyEntity();
+        j.setId(java.util.UUID.randomUUID());
+        when(journeys.latestForChild(hasher.hash("17165550100"))).thenReturn(Optional.of(j));
+        when(controller.describePlan(j)).thenReturn("Plan: ...");
+        router.handle(msg(InboundMessage.Type.TEXT, "plan", null, null, null));
+        verify(whatsApp).sendText("17165550100", "Plan: ...");
+        when(controller.fireNext(j)).thenReturn(Optional.empty());
+        router.handle(msg(InboundMessage.Type.TEXT, "next", null, null, null));
+        verify(whatsApp).sendText(eq("17165550100"), contains("not said 'start my trip'"));
     }
 
     @Test

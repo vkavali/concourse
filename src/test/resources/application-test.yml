@@ -21,3 +21,6 @@ concourse:
     cache-dir: ""
   itinerary:
     allow-past-dates: true
+  scheduler:
+    initial-delay-ms: 3600000   # tests drive the clock themselves
+    delay-ms: 3600000

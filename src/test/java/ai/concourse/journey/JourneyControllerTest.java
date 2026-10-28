@@ -143,13 +143,13 @@ class JourneyControllerTest {
         travelToAndTick(stage(StageType.BOARDING_ORIGIN));
         assertEquals(StageEntity.SKIPPED, stage(StageType.WAITING_AT_ORIGIN).getStatus());
         assertEquals("BOARDING_ORIGIN", fresh().getStatus());
-        verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
+        verify(channel).sendImage(eq(PARENT), any(byte[].class), contains("B12"));
         verify(channel).sendButtons(eq(PARENT), contains("గేట్ B12 దగ్గర బోర్డింగ్"), any());
 
         // --- verified gate change for the second flight: plan rebuilt, both phones told
         assertTrue(controller.applyGateChange(fresh(), 2, "C7", "demo operations event"));
         assertEquals("C7", journeys.segments(journey.getId()).get(1).getGate());
-        verify(channel).sendImage(eq(PARENT), any(), contains("C7"));
+        verify(channel).sendImage(eq(PARENT), any(byte[].class), contains("C7"));
         verify(channel).sendText(eq(PARENT), contains("కొత్త గేట్ C7"));
         verify(channel).sendText(eq(CHILD), contains("gate C7"));
         List<StageEntity> rebuilt = controller.stages(journey.getId());

@@ -1,0 +1,2 @@
+# fingerprint of a false positive: a test's fake API key next to a voice name (commit:file:rule:line)
+288327c156760c9d0d50ed437366dde88240bb54:src/test/java/ai/concourse/tts/TtsClientTest.java:generic-api-key:43

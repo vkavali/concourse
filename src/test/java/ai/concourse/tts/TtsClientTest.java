@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TtsClientTest {
+    private static final String API_KEY = "test";                 // never a real key: the repo is public and secret-scanned
+    private static final String VOICE = "te-IN-Chirp3-HD-Aoede";
     private MockWebServer server;
     private TtsClient client;
     private final List<byte[]> encoded = new ArrayList<>();
@@ -40,7 +42,7 @@ class TtsClientTest {
     void setUp() throws Exception {
         server = new MockWebServer();
         server.start();
-        client = new TtsClient(null, null, cache.toString(), "google", "test-key", "te-IN-Chirp3-HD-Aoede", 0,
+        client = new TtsClient(null, null, cache.toString(), "google", API_KEY, VOICE, 0,
                 WebClient.builder(), noFfmpeg, server.url("/v1").toString());
     }
 
@@ -60,11 +62,11 @@ class TtsClientTest {
         for (int i = 0; i < 3; i++) {
             RecordedRequest r = server.takeRequest(1, TimeUnit.SECONDS);
             assertEquals("/v1/text:synthesize", r.getPath());
-            assertEquals("test-key", r.getHeader("X-Goog-Api-Key"));
+            assertEquals(API_KEY, r.getHeader("X-Goog-Api-Key"));
             bodies.add(r.getBody().readUtf8());
         }
         assertTrue(bodies.stream().allMatch(b -> b.contains("\"audioEncoding\":\"LINEAR16\"") && b.contains("\"sampleRateHertz\":24000")
-                && b.contains("\"name\":\"te-IN-Chirp3-HD-Aoede\"") && b.contains("\"speakingRate\":0.85")), bodies.toString());
+                && b.contains("\"name\":\"" + VOICE + "\"") && b.contains("\"speakingRate\":0.85")), bodies.toString());
         assertTrue(bodies.stream().anyMatch(b -> b.contains("\"text\":\"బీ పన్నెండు.\"")), "the code is its own phrase");
         assertTrue(bodies.stream().anyMatch(b -> b.contains("\"text\":\"గేట్\"")));
     }

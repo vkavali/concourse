@@ -47,11 +47,12 @@ jobs:
       - name: Install ffmpeg
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
       - name: Test
+        id: test
         run: |
           set -o pipefail
           ./gradlew test --no-daemon --console=plain 2>&1 | tee build.log
       - name: Post failure summary as a commit comment
-        if: failure()
+        if: failure() && steps.test.outcome == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

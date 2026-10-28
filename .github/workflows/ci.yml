@@ -3,6 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:   # manual run = secret scan over the whole history
 
 permissions:
   contents: write   # lets the failure step post the error summary as a commit comment

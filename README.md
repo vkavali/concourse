@@ -33,6 +33,16 @@ with `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages`.
 
 Airport time zones come from the OpenFlights airports database (ODbL) — `src/main/resources/data/airports.csv`.
 
+## Demo in ten minutes (one phone)
+
+1. Send the boarding pass → **Confirm**.
+2. `mode parent` → tap **నా ప్రయాణం మొదలు** on the intro (her consent; nothing is pushed before it).
+3. `mode child` → `next` fires the next planned stage now (the journey clock jumps to its time): CHECK_IN, SECURITY, gate stages with the card, transfer, arrival, FAMILY_HANDOFF.
+4. `gate C7` / `gate 2 C7` = a labelled simulated operations event: the only way a gate changes; both phones are told.
+5. Tap **నేను వచ్చాను** ("I'm here") on the last stage → journey complete.
+
+`plan` lists the timeline, `status` the itinerary, `clock reset` returns to real time. Ops: `POST /ops/events` and `POST /ops/clock` with header `X-Admin-Token` (set `ADMIN_TOKEN`).
+
 ## Hosting (Railway)
 
 1. railway.com → New Project → Deploy from GitHub repo → `vkavali/concourse`. The Dockerfile builds the jar with ffmpeg.

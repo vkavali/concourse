@@ -32,8 +32,10 @@ import static org.mockito.Mockito.*;
 @SpringBootTest
 @ActiveProfiles("test")
 class JourneyControllerTest {
-    private static final String PARENT = "919876543210";
-    private static final String CHILD = "17165550100";
+    // Unique numbers per test method: the in-memory DB is shared by every Spring test in the JVM, and a leftover
+    // journey for the same number would fire its own stages into this test's verifications.
+    private String PARENT;
+    private String CHILD;
 
     @Autowired JourneyController controller;
     @Autowired JourneyService journeys;
@@ -44,6 +46,7 @@ class JourneyControllerTest {
     @Autowired EventRepository events;
     @Autowired ConcourseClock clock;
     @Autowired ai.concourse.common.PhoneHasher hasher;
+    @Autowired JourneyRepository journeyRepo;
     @MockBean WhatsAppClient channel;   // the one MessagingChannel in the context
     @MockBean TtsClient tts;
     @MockBean InboundMessageHandler handler;
@@ -53,6 +56,10 @@ class JourneyControllerTest {
     @BeforeEach
     void setUp() {
         clock.reset();
+        journeyRepo.deleteAll(); // stages, jobs, segments and events cascade
+        String suffix = String.valueOf(System.nanoTime() % 100_000_000L);
+        PARENT = "9198" + ("00000000" + suffix).substring(suffix.length());
+        CHILD = "1716" + ("00000000" + suffix).substring(suffix.length());
         when(tts.isConfigured()).thenReturn(false);
         contacts.register(CHILD, ContactEntity.Role.CHILD, "en");
         contacts.register(PARENT, ContactEntity.Role.PARENT, "te");
@@ -184,7 +191,7 @@ class JourneyControllerTest {
         Map<String, Long> perStage = sentStages.stream().collect(Collectors.groupingBy(x -> x, Collectors.counting()));
         assertTrue(perStage.values().stream().allMatch(n -> n == 1), perStage.toString());
         assertTrue(jobRepo.findByJourneyIdAndStatus(journey.getId(), OutboundJobEntity.PENDING).isEmpty(), "no job left behind");
-        verify(channel, never()).sendTemplate(any(), any(), any(), any());
+        verify(channel, never()).sendTemplate(eq(PARENT), any(), any(), any());
     }
 
     @Test

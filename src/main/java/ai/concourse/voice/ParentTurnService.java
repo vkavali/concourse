@@ -7,6 +7,7 @@ import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyFacts;
 import ai.concourse.journey.JourneyService;
+import ai.concourse.journey.StageEntity;
 import ai.concourse.journey.StageType;
 import ai.concourse.safety.SafetyPolicy;
 import ai.concourse.spark.PromptLoader;
@@ -129,9 +130,10 @@ public class ParentTurnService {
                 if (j.getConsentAt() == null) {
                     messenger.speak(parentWaId, text, StageText.buttons(StageType.PRE_TRIP), facts);
                 } else {
-                    StageType current = controller.current(j).map(s -> s.stageType()).orElse(StageType.PRE_TRIP);
-                    if (current.showsGateCard()) messenger.sendGateCard(parentWaId, facts, controller.current(j).map(s -> s.getSegmentSeq()).orElse(null));
-                    messenger.speak(parentWaId, text, StageText.buttons(current), facts);
+                    Optional<StageEntity> current = controller.current(j);
+                    StageType type = current.map(StageEntity::stageType).orElse(null);
+                    if (type != null && type.showsGateCard()) messenger.sendGateCard(parentWaId, facts, current.get().getSegmentSeq());
+                    messenger.speak(parentWaId, text, type == null ? null : StageText.buttons(type), facts);
                 }
                 return "what_next";
             }

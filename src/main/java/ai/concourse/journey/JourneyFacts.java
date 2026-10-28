@@ -1,6 +1,7 @@
 package ai.concourse.journey;
 
 import ai.concourse.itinerary.Airports;
+import ai.concourse.itinerary.Terminals;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -47,7 +48,7 @@ public record JourneyFacts(
             flights.add(new Flight(s.getSeq(), s.getAirline(), s.getFlightNumber(), s.getOrigin(), s.getDestination(),
                     local(s.getScheduledDeparture(), s.getOrigin(), airports),
                     local(s.getScheduledArrival(), s.getDestination(), airports),
-                    s.getTerminal(), s.getGate(), s.getGate() != null && s.getLastVerifiedAt() != null));
+                    Terminals.normalize(s.getTerminal()), s.getGate(), s.getGate() != null && s.getLastVerifiedAt() != null));
         }
         String next = flights.isEmpty() ? "No flights on file." : nextStep(flights.get(0));
         return new JourneyFacts(j.getStatus(), j.getPassengerFirstName(), flights, next, null, null);

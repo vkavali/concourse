@@ -208,14 +208,8 @@ public class ItineraryValidator {
         return s == null || s.isBlank() ? null : s.strip();
     }
 
-    private static final Pattern TERMINAL = Pattern.compile("^(?:terminal|term\\.?|t)\\s*-?\\s*(\\d{1,2}|[A-Z])$", Pattern.CASE_INSENSITIVE);
-
     /** "T3", "Terminal 3", "T-3" → "3"; "D" stays "D". The card and the voice say "టెర్మినల్ 3", never "టెర్మినల్ టీ మూడు". */
     static String normalizeTerminal(String terminal) {
-        String t = blankToNull(terminal);
-        if (t == null) return null;
-        java.util.regex.Matcher m = TERMINAL.matcher(t);
-        if (m.matches()) return m.group(1).toUpperCase(Locale.ROOT);
-        return t.length() <= 3 ? t.toUpperCase(Locale.ROOT) : t;
+        return Terminals.normalize(terminal);
     }
 }

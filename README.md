@@ -32,3 +32,14 @@ with `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages`.
 - `eval/tickets/` — ticket → itinerary accuracy. `eval/safety/` — adversarial suite (Day 4).
 
 Airport time zones come from the OpenFlights airports database (ODbL) — `src/main/resources/data/airports.csv`.
+
+## Hosting (Railway)
+
+1. railway.com → New Project → Deploy from GitHub repo → `vkavali/concourse`. The Dockerfile builds the jar with ffmpeg.
+2. `+ New` → Database → PostgreSQL.
+3. Open the concourse service → Variables → Raw Editor → paste your `.env` (drop the `DATABASE_URL` line), then
+   add a variable reference `DATABASE_URL` = `${{Postgres.DATABASE_URL}}`. The app converts the `postgresql://` URL to JDBC.
+4. Settings → Networking → Generate Domain → `https://<name>.up.railway.app`.
+5. Meta app → WhatsApp → Configuration → Webhook: callback `https://<name>.up.railway.app/webhook/whatsapp`,
+   verify token = `WHATSAPP_VERIFY_TOKEN`. Verify and save. Stop ngrok.
+6. The hosted database starts empty: send the ticket again, Confirm, register the traveler.

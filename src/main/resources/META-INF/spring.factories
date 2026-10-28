@@ -1,1 +1,1 @@
-org.springframework.boot.env.EnvironmentPostProcessor=ai.concourse.config.DotenvEnvironmentPostProcessor
+org.springframework.boot.env.EnvironmentPostProcessor=ai.concourse.config.DotenvEnvironmentPostProcessor,ai.concourse.config.DatabaseUrlEnvironmentPostProcessor

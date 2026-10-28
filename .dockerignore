@@ -1,0 +1,12 @@
+.git
+.github
+.gradle
+build
+data
+.env
+*.ogg
+*.wav
+eval
+docs
+dispatch
+modal

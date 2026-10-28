@@ -16,30 +16,21 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
 
 /**
- * The "simple card": a PNG the parent can read at a glance and show to staff. Rendered from verified facts only —
- * no model in the loop — so it can never show a gate that is not on file. Telugu for her, English for staff.
+ * The "simple card": a PNG the parent shows to airport staff. English, because the people who read it are the
+ * people at the airport — the gate code is drawn exactly as the signs print it, so she can match the shapes
+ * "B 12" to "Gate B12" without reading a word. One small Telugu line at the bottom tells her what to do with it.
+ * Rendered from verified facts only — no model in the loop — so it can never show a gate that is not on file.
  */
 @Component
 public class CardRenderer {
     private static final Logger log = LoggerFactory.getLogger(CardRenderer.class);
-    private static final int W = 1080, H = 1080;
+    private static final int W = 1080, H = 1080, MAX_TEXT_W = 1000;
     private static final Color NAVY = new Color(0x0B, 0x3D, 0x91);
     private static final Color INK = new Color(0x11, 0x11, 0x11);
     private static final Color GREY = new Color(0x55, 0x55, 0x55);
     private static final Color AMBER = new Color(0xB4, 0x5F, 0x06);
-
-    /** Telugu city names for the airports a Hyderabad→US traveler is likely to pass through; Latin fallback otherwise. */
-    private static final Map<String, String> CITY_TE = Map.ofEntries(
-            Map.entry("HYD", "హైదరాబాద్"), Map.entry("DOH", "దోహా"), Map.entry("DFW", "డల్లాస్"), Map.entry("DXB", "దుబాయ్"),
-            Map.entry("AUH", "అబుదాబి"), Map.entry("FRA", "ఫ్రాంక్‌ఫర్ట్"), Map.entry("LHR", "లండన్"), Map.entry("JFK", "న్యూయార్క్"),
-            Map.entry("EWR", "న్యూవార్క్"), Map.entry("SFO", "శాన్ ఫ్రాన్సిస్కో"), Map.entry("DEL", "ఢిల్లీ"), Map.entry("BOM", "ముంబై"),
-            Map.entry("BLR", "బెంగళూరు"), Map.entry("MAA", "చెన్నై"), Map.entry("IAH", "హ్యూస్టన్"), Map.entry("ORD", "చికాగో"),
-            Map.entry("SEA", "సియాటిల్"), Map.entry("LAX", "లాస్ ఏంజెలెస్"), Map.entry("IAD", "వాషింగ్టన్"), Map.entry("ATL", "అట్లాంటా"),
-            Map.entry("BOS", "బోస్టన్"), Map.entry("CDG", "పారిస్"), Map.entry("AMS", "ఆమ్‌స్టర్‌డామ్"), Map.entry("SIN", "సింగపూర్"),
-            Map.entry("MUC", "మ్యూనిక్"), Map.entry("ZRH", "జ్యూరిచ్"), Map.entry("IST", "ఇస్తాంబుల్"));
 
     private final Font telugu;
     private final Font latinBold;
@@ -53,7 +44,7 @@ public class CardRenderer {
         this.latin = load("fonts/DejaVuSans.ttf");
     }
 
-    /** Gate card for the given flight: huge gate code, Telugu label, flight + route, staff line. */
+    /** Gate card for the given flight: GATE band, huge gate code, flight + route, the ask to staff. */
     public byte[] gateCard(JourneyFacts.Flight f) {
         BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
@@ -65,34 +56,28 @@ public class CardRenderer {
 
         boolean known = f.gate() != null && !f.gate().isBlank();
         g.setColor(known ? NAVY : AMBER);
-        g.fillRect(0, 0, W, 250);
+        g.fillRect(0, 0, W, 230);
         g.setColor(Color.WHITE);
-        g.setFont(telugu.deriveFont(140f));
-        center(g, "గేట్", 185);
+        fit(g, "GATE", latinBold, 150f, 170);
 
         if (known) {
             g.setColor(INK);
-            String code = spaced(f.gate());
-            float size = code.length() <= 4 ? 420f : code.length() <= 6 ? 300f : 220f;
-            g.setFont(latinBold.deriveFont(size));
-            center(g, code, 690);
+            fit(g, spaced(f.gate()), latinBold, 440f, 640);
         } else {
             g.setColor(INK);
-            g.setFont(latinBold.deriveFont(360f));
-            center(g, "?", 640);
-            g.setFont(telugu.deriveFont(70f));
+            fit(g, "?", latinBold, 330f, 600);
             g.setColor(AMBER);
-            center(g, "గేట్ ఇంకా ప్రకటించలేదు", 760); // gate not announced yet
+            fit(g, "Not assigned yet — check the screens", latinBold, 56f, 720);
         }
 
+        g.setColor(INK);
+        fit(g, "Flight " + f.flight() + "  ·  " + f.from() + " → " + f.to(), latinBold, 64f, 830);
         g.setColor(GREY);
-        g.setFont(telugu.deriveFont(60f));
-        center(g, "విమానం " + f.flight() + "   " + city(f.from()) + " నుండి " + city(f.to()) + " కు", 860);
-        g.setFont(latinBold.deriveFont(42f));
-        String gateLine = known ? "GATE " + f.gate() : "GATE: not yet assigned — check the screens";
-        center(g, gateLine + " · Flight " + f.flight() + " " + f.from() + " → " + f.to(), 935);
-        g.setFont(latin.deriveFont(40f));
-        center(g, "I speak Telugu, not English — please help me", 1005);
+        fit(g, routeLine(f), latin, 46f, 900);
+        g.setColor(INK);
+        fit(g, "I speak Telugu, not English. Please help me find this gate.", latin, 42f, 975);
+        g.setColor(GREY);
+        fit(g, "ఈ కార్డును సిబ్బందికి చూపించండి", telugu, 36f, 1045); // "show this card to staff" — for her
         g.dispose();
 
         try {
@@ -104,10 +89,15 @@ public class CardRenderer {
         }
     }
 
+    /** "Air India  ·  Delhi to San Francisco" (whatever is known). */
+    private String routeLine(JourneyFacts.Flight f) {
+        String airline = f.airline() == null ? "" : f.airline().strip();
+        String route = city(f.from()) + " to " + city(f.to());
+        return airline.isEmpty() ? route : airline + "  ·  " + route;
+    }
+
     private String city(String iata) {
         if (iata == null) return "";
-        String te = CITY_TE.get(iata);
-        if (te != null) return te;
         return airports.find(iata).map(Airports.Airport::city).orElse(iata);
     }
 
@@ -116,7 +106,15 @@ public class CardRenderer {
         return gate.strip().toUpperCase().replaceAll("([A-Z])(\\d)", "$1 $2").replaceAll("(\\d)([A-Z])", "$1 $2");
     }
 
-    private void center(Graphics2D g, String s, int baseline) {
+    /** Draws centred, shrinking the font until the line fits the card — nothing is ever cut off at the edges. */
+    private void fit(Graphics2D g, String s, Font font, float size, int baseline) {
+        Font f = font.deriveFont(size);
+        g.setFont(f);
+        while (g.getFontMetrics().stringWidth(s) > MAX_TEXT_W && size > 16f) {
+            size -= 2f;
+            f = font.deriveFont(size);
+            g.setFont(f);
+        }
         int w = g.getFontMetrics().stringWidth(s);
         g.drawString(s, (W - w) / 2, baseline);
     }

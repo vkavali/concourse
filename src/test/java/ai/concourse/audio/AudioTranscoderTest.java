@@ -34,7 +34,7 @@ class AudioTranscoderTest {
 
         byte[] ogg = t.toOggOpusVoiceNote(wav44k);
         assertEquals("OggS", new String(ogg, 0, 4, StandardCharsets.US_ASCII));
-        assertTrue(ogg.length < 20_000, "1 s at 24 kbps should be a few KB, was " + ogg.length);
+        assertTrue(ogg.length < 20_000, "1 s at 32 kbps should be a few KB, was " + ogg.length);
 
         byte[] wav16 = t.toWav16kMono(ogg);
         assertEquals("RIFF", new String(wav16, 0, 4, StandardCharsets.US_ASCII));

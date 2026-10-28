@@ -33,6 +33,17 @@ class CardRendererTest {
     }
 
     @Test
+    void nothingIsCutOffAtTheEdges() throws Exception {
+        byte[] png = renderer.gateCard(new JourneyFacts.Flight(1, "American Airlines", "AA2914", "DFW", "SFO", "2026-11-28 08:40", null, "D", "D40A", true));
+        BufferedImage img = ImageIO.read(new ByteArrayInputStream(png));
+        for (int y = 240; y < img.getHeight(); y += 3) {
+            for (int x : new int[]{0, 8, 16, 24, img.getWidth() - 25, img.getWidth() - 17, img.getWidth() - 9, img.getWidth() - 1}) {
+                assertEquals(0xFFFFFF, img.getRGB(x, y) & 0xFFFFFF, "ink at the edge (" + x + "," + y + ") means a line overflowed");
+            }
+        }
+    }
+
+    @Test
     void gateCodesAreSpacedForReading() {
         assertEquals("B 12", CardRenderer.spaced("b12"));
         assertEquals("D 40 A", CardRenderer.spaced("D40A"));

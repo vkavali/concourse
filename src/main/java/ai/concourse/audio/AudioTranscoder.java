@@ -41,10 +41,14 @@ public class AudioTranscoder {
                 "-map_metadata", "-1", "-fflags", "+bitexact", "-f", "wav"));
     }
 
-    /** WAV → OGG/Opus mono at 24 kbps, speech-optimised. A 60 s note lands around 180 KB (well under WhatsApp's 512 KB inline-play limit). */
+    /**
+     * WAV → OGG/Opus mono at 32 kbps, full-band ("audio" mode keeps the voice warm; "voip" thins it), loudness
+     * levelled to -19 LUFS so every note plays at the same volume. A 60 s note lands around 240 KB (under WhatsApp's
+     * 512 KB inline-play limit).
+     */
     public byte[] toOggOpusVoiceNote(byte[] wav) {
-        return run(wav, "in.wav", List.of("-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "24k",
-                "-application", "voip", "-map_metadata", "-1", "-f", "ogg"));
+        return run(wav, "in.wav", List.of("-af", "loudnorm=I=-19:TP=-1.5:LRA=9", "-ac", "1", "-ar", "48000",
+                "-c:a", "libopus", "-b:a", "32k", "-application", "audio", "-map_metadata", "-1", "-f", "ogg"));
     }
 
     /** Duration of a canonical 16 kHz mono 16-bit WAV (as produced by {@link #toWav16kMono}). */

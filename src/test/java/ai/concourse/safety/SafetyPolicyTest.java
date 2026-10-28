@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class SafetyPolicyTest {
     private final SafetyPolicy policy = new SafetyPolicy();
     private final JourneyFacts facts = new JourneyFacts("PRE_TRIP", "Lakshmi", List.of(
-            new JourneyFacts.Flight(1, "QR729", "DOH", "DFW", "2026-11-28 08:40", "2026-11-28 15:50", "D", "B12", true)),
+            new JourneyFacts.Flight(1, "Qatar Airways", "QR729", "DOH", "DFW", "2026-11-28 08:40", "2026-11-28 15:50", "D", "B12", true)),
             "Flight QR729 …", null, null);
     private final JourneyFacts noGate = new JourneyFacts("PRE_TRIP", "Lakshmi", List.of(
-            new JourneyFacts.Flight(1, "QR729", "DOH", "DFW", "2026-11-28 08:40", null, null, null, false)),
+            new JourneyFacts.Flight(1, "Qatar Airways", "QR729", "DOH", "DFW", "2026-11-28 08:40", null, null, null, false)),
             "Flight QR729 …", null, null);
 
     @Test

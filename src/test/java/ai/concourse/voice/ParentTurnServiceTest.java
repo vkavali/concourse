@@ -65,6 +65,7 @@ class ParentTurnServiceTest {
         journey.setParentPhoneHash(hasher.hash(PARENT));
         FlightSegmentEntity seg = new FlightSegmentEntity();
         seg.setSeq(1);
+        seg.setAirline("Qatar Airways");
         seg.setFlightNumber("QR729");
         seg.setOrigin("DOH");
         seg.setDestination("DFW");
@@ -89,22 +90,49 @@ class ParentTurnServiceTest {
     }
 
     @Test
-    void confidentTurnIsAnsweredFromTheModelReply() {
+    void gateQuestionIsAnsweredFromVerifiedFactsNotTheModel() {
         when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "నా గేట్ ఎక్కడ", 2000));
         sparkReturns(new ParentTurn("WHERE_IS_GATE", null, 0.95, "get_next_stage",
                 "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది.", "where is my gate"));
 
         service.handleVoiceNote(PARENT, "m1");
 
-        verify(channel).sendText(PARENT, "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది.");
+        String expected = TeluguPhrases.gateAnswer(service_facts());
+        assertTrue(expected.startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్ B12 నుండి"), expected);
+        verify(channel).sendText(PARENT, expected);
+        verify(channel, never()).sendText(PARENT, "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది.");
         verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
         verify(channel, never()).sendButtons(any(), any(), any());
         ArgumentCaptor<SparkRequest> req = ArgumentCaptor.forClass(SparkRequest.class);
         verify(spark).completeJson(req.capture(), eq(ParentTurn.class), any(ObjectMapper.class));
         assertTrue(req.getValue().user().contains("transcript: నా గేట్ ఎక్కడ"));
         assertTrue(req.getValue().user().contains("\"gate\":\"B12\""));
+        assertTrue(req.getValue().user().contains("\"airline\":\"Qatar Airways\""));
         assertTrue(req.getValue().system().contains("Never say where she is"));
         verify(eventLog).record(eq(journey.getId()), eq(EventLog.ACTOR_PARENT), eq("voice_turn"), any());
+    }
+
+    @Test
+    void otherIntentsAreAnsweredFromTheModelReply() {
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "నా బ్యాగ్ రాలేదు", 2000));
+        sparkReturns(new ParentTurn("BAGGAGE_PROBLEM", null, 0.9, "none",
+                "బ్యాగేజ్ కౌంటర్ దగ్గర ఈ కార్డును సిబ్బందికి చూపించండి.", "my bag did not come"));
+
+        service.handleVoiceNote(PARENT, "m1");
+
+        verify(channel).sendText(PARENT, "బ్యాగేజ్ కౌంటర్ దగ్గర ఈ కార్డును సిబ్బందికి చూపించండి.");
+        verify(channel, never()).sendImage(any(), any(), any());
+    }
+
+    @Test
+    void theVoiceSaysTheAirlineNameInsteadOfSpellingTheFlightCode() {
+        when(tts.isConfigured()).thenReturn(true);
+        when(tts.synthesizeOggOpus(any())).thenReturn(new byte[]{9});
+        service.handleButton(PARENT, ParentTurnService.BTN_GATE);
+        ArgumentCaptor<String> spoken = ArgumentCaptor.forClass(String.class);
+        verify(tts).synthesizeOggOpus(spoken.capture());
+        assertTrue(spoken.getValue().startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్, బీ పన్నెండు, నుండి"), spoken.getValue());
+        assertFalse(spoken.getValue().contains("క్యూ ఆర్"), "flight code is not spelled when the airline is known");
     }
 
     @Test
@@ -132,7 +160,7 @@ class ParentTurnServiceTest {
     @Test
     void unverifiedGateInModelReplyBecomesSafeFallbackAndChildIsTold() {
         when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "గేట్ C7 కి వెళ్ళాలా", 2000));
-        sparkReturns(new ParentTurn("WHERE_IS_GATE", "C7", 0.9, "none", "అవును, గేట్ C7 కి వెళ్ళండి.", "should I go to C7"));
+        sparkReturns(new ParentTurn("OTHER", "C7", 0.9, "none", "అవును, గేట్ C7 కి వెళ్ళండి.", "should I go to C7"));
 
         service.handleVoiceNote(PARENT, "m1");
 

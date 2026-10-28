@@ -117,6 +117,17 @@ class ItineraryValidatorTest {
     }
 
     @Test
+    void terminalsAreNormalisedToWhatTheSignsSay() {
+        assertEquals("3", ItineraryValidator.normalizeTerminal("T3"));
+        assertEquals("3", ItineraryValidator.normalizeTerminal("Terminal 3"));
+        assertEquals("3", ItineraryValidator.normalizeTerminal("t-3"));
+        assertEquals("D", ItineraryValidator.normalizeTerminal("Terminal D"));
+        assertEquals("D", ItineraryValidator.normalizeTerminal("d"));
+        assertEquals("1C", ItineraryValidator.normalizeTerminal("1c"));
+        assertNull(ItineraryValidator.normalizeTerminal(" "));
+    }
+
+    @Test
     void lowConfidenceAndOddFlightNumberAreUnverified() {
         ValidatedItinerary v = validator.validate(ticket(
                 new Itinerary.Segment(null, "QATAR 4793", "HYD", "DOH", "2026-11-28T03:45", "2026-11-28T06:05", "T2", null, 0.5, "blurry")));
@@ -124,7 +135,7 @@ class ItineraryValidatorTest {
         ValidatedItinerary.Segment s = v.segments().get(0);
         assertTrue(s.unverifiedFields().contains("flight_number"));
         assertTrue(s.unverifiedFields().contains("segment"));
-        assertEquals("T2", s.terminal());
+        assertEquals("2", s.terminal(), "T2 is terminal 2");
         assertNull(s.airline());
     }
 

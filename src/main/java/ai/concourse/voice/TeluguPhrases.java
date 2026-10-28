@@ -26,27 +26,38 @@ public final class TeluguPhrases {
     public static final String BTN_HELP = "సహాయం కావాలి";     // I need help
     public static final String BTN_SON = "కొడుకుకు చెప్పు";    // Tell my son
 
-    /** "Attention: your gate has changed. New gate: X. Again: gate X. Follow the boards that say gate X. See the card." */
+    /** "Your Air India flight" when the airline is known; otherwise "your flight AI173" (the voice spells the code). */
+    public static String yourFlight(JourneyFacts.Flight f) {
+        return Airlines.teluguName(f.airline(), f.flight())
+                .map(name -> "మీ " + name + " విమానం")
+                .orElse("మీ విమానం " + f.flight());
+    }
+
+    /** "Attention: your flight's gate has changed. New gate: X. Again: gate X. Follow the boards that say gate X. See the card." */
     public static String gateChanged(JourneyFacts.Flight f) {
         if (f.gate() == null) {
-            return "గమనించండి: మీ విమానం " + f.flight() + " గేట్ మారింది. కొత్త గేట్ ఇంకా ప్రకటించలేదు. దయచేసి పెద్ద స్క్రీన్ చూడండి, లేదా ఈ కార్డును సిబ్బందికి చూపించండి.";
+            return "గమనించండి: " + yourFlight(f) + " గేట్ మారింది. కొత్త గేట్ ఇంకా ప్రకటించలేదు. దయచేసి పెద్ద స్క్రీన్ చూడండి, లేదా ఈ కార్డును సిబ్బందికి చూపించండి.";
         }
-        return "గమనించండి: మీ విమానం " + f.flight() + " గేట్ మారింది. కొత్త గేట్ " + f.gate() + ". "
+        return "గమనించండి: " + yourFlight(f) + " గేట్ మారింది. కొత్త గేట్ " + f.gate() + ". "
                 + "మళ్ళీ చెబుతున్నాను: గేట్ " + f.gate() + ". గేట్ " + f.gate() + " అని రాసిన బోర్డులను అనుసరించండి. కార్డు చూడండి.";
     }
 
-    /** Gate answer from verified facts: known gate, or "not announced yet, look at the big screen / show the card". */
+    /**
+     * The gate answer, from verified facts only — a fixed template, never model prose: "Your Air India flight leaves
+     * from gate B12. Again: gate B12. Follow the boards that say gate B12. See the card." Or, with no gate yet:
+     * "not announced yet; terminal 3; look at the big screen or show the card to staff".
+     */
     public static String gateAnswer(JourneyFacts facts) {
         JourneyFacts.Flight f = facts == null ? null : facts.firstFlight();
         if (f == null) return NOT_SET_UP;
         if (f.gate() != null) {
             // The gate is said twice, slowly, the way staff repeat it; the card shows it in large print.
-            return "మీ విమానం " + f.flight() + " గేట్ " + f.gate() + " నుండి బయలుదేరుతుంది. "
+            return yourFlight(f) + " గేట్ " + f.gate() + " నుండి బయలుదేరుతుంది. "
                     + "మళ్ళీ చెబుతున్నాను: గేట్ " + f.gate() + ". "
                     + "గేట్ " + f.gate() + " అని రాసిన బోర్డులను అనుసరించండి. కార్డు చూడండి.";
         }
         String terminal = f.terminal() == null ? "" : " టెర్మినల్ " + f.terminal() + ".";
-        return "మీ విమానం " + f.flight() + " గేట్ ఇంకా ప్రకటించలేదు." + terminal
+        return yourFlight(f) + " గేట్ ఇంకా ప్రకటించలేదు." + terminal
                 + " దయచేసి పెద్ద స్క్రీన్ చూడండి, లేదా ఈ కార్డును సిబ్బందికి చూపించండి.";
     }
 }

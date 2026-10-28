@@ -30,6 +30,7 @@ public record JourneyFacts(
 
     public record Flight(
             @JsonProperty("seq") int seq,
+            @JsonProperty("airline") String airline,
             @JsonProperty("flight") String flight,
             @JsonProperty("from") String from,
             @JsonProperty("to") String to,
@@ -43,7 +44,7 @@ public record JourneyFacts(
     public static JourneyFacts of(JourneyEntity j, List<FlightSegmentEntity> segments, Airports airports) {
         List<Flight> flights = new ArrayList<>();
         for (FlightSegmentEntity s : segments) {
-            flights.add(new Flight(s.getSeq(), s.getFlightNumber(), s.getOrigin(), s.getDestination(),
+            flights.add(new Flight(s.getSeq(), s.getAirline(), s.getFlightNumber(), s.getOrigin(), s.getDestination(),
                     local(s.getScheduledDeparture(), s.getOrigin(), airports),
                     local(s.getScheduledArrival(), s.getDestination(), airports),
                     s.getTerminal(), s.getGate(), s.getGate() != null && s.getLastVerifiedAt() != null));
@@ -71,7 +72,10 @@ public record JourneyFacts(
         for (Flight f : flights) {
             if (f.flight() != null) codes.add(norm(f.flight()));
             if (f.gate() != null) codes.add(norm(f.gate()));
-            if (f.terminal() != null) codes.add(norm(f.terminal()));
+            if (f.terminal() != null) {
+                codes.add(norm(f.terminal()));
+                if (f.terminal().chars().allMatch(Character::isDigit)) codes.add("T" + f.terminal());
+            }
             codes.add(norm(f.from()));
             codes.add(norm(f.to()));
         }

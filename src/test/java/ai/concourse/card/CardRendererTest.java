@@ -15,7 +15,7 @@ class CardRendererTest {
 
     @Test
     void rendersAGateCardPng() throws Exception {
-        byte[] png = renderer.gateCard(new JourneyFacts.Flight(1, "QR729", "DOH", "DFW", "2026-11-28 08:40", null, "D", "B12", true));
+        byte[] png = renderer.gateCard(new JourneyFacts.Flight(1, "Qatar Airways", "QR729", "DOH", "DFW", "2026-11-28 08:40", null, "D", "B12", true));
         assertTrue(png.length > 10_000, "png bytes: " + png.length);
         assertEquals((byte) 0x89, png[0]);
         BufferedImage img = ImageIO.read(new ByteArrayInputStream(png));
@@ -27,7 +27,7 @@ class CardRendererTest {
 
     @Test
     void unknownGateCardStillRenders() throws Exception {
-        byte[] png = renderer.gateCard(new JourneyFacts.Flight(1, "AI173", "DEL", "SFO", "2026-06-06 00:05", null, null, null, false));
+        byte[] png = renderer.gateCard(new JourneyFacts.Flight(1, "Air India", "AI173", "DEL", "SFO", "2026-06-06 00:05", null, null, null, false));
         BufferedImage img = ImageIO.read(new ByteArrayInputStream(png));
         assertNotNull(img);
     }

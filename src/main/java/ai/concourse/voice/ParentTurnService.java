@@ -116,14 +116,17 @@ public class ParentTurnService {
             event.put("intent", turn.intent());
             event.put("confidence", turn.confidence());
             event.put("tool", turn.toolProposal());
-            String reply = turn.replyTe();
+            // Spark classifies the intent; the gate itself is answered by a fixed template from verified facts, so the
+            // most important sentence of the journey never depends on model prose (or on how a model spells a code).
+            boolean gateQuestion = "WHERE_IS_GATE".equals(turn.intent()) || "WHAT_NEXT".equals(turn.intent());
+            String reply = gateQuestion ? TeluguPhrases.gateAnswer(facts) : turn.replyTe();
             SafetyPolicy.Result checked = safety.check(reply, facts);
             if (!checked.ok()) {
                 event.put("safety_violations", checked.violations());
                 notifyChild(journey.get(), "safety fallback: " + String.join("; ", checked.violations()), turn.englishGloss());
             }
             executeTool(turn, journey.get(), facts, parentWaId);
-            if ("WHERE_IS_GATE".equals(turn.intent()) || "WHAT_NEXT".equals(turn.intent())) sendGateCard(parentWaId, facts);
+            if (gateQuestion) sendGateCard(parentWaId, facts);
             speak(parentWaId, checked.text(), null, facts);
             event.put("outcome", checked.ok() ? "replied" : "fallback");
         }
@@ -223,7 +226,8 @@ public class ParentTurnService {
         String text = checked.text();
         if (tts.isConfigured()) {
             try {
-                channel.sendVoiceNote(to, tts.synthesizeOggOpus(TeluguSpeech.spokenForm(text)));
+                Map<String, String> names = Airlines.spokenNames(facts == null ? null : facts.flights());
+                channel.sendVoiceNote(to, tts.synthesizeOggOpus(TeluguSpeech.spokenForm(text, names)));
             } catch (Exception e) {
                 log.warn("tts failed, sending text only: {}", e.getMessage());
             }

@@ -2,14 +2,16 @@ package ai.concourse.voice;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class TeluguSpeechTest {
     @Test
     void gateCodesReadLikeStaffSayThem() {
-        assertEquals("బి పన్నెండు", TeluguSpeech.spokenForm("B12"));
-        assertEquals("సి ఏడు", TeluguSpeech.spokenForm("C7"));
-        assertEquals("డి నలభై ఏ", TeluguSpeech.spokenForm("D40A"));
+        assertEquals("బీ పన్నెండు", TeluguSpeech.spokenForm("B12"));
+        assertEquals("సీ ఏడు", TeluguSpeech.spokenForm("C7"));
+        assertEquals("డీ నలభై ఏ", TeluguSpeech.spokenForm("D40A"));
     }
 
     @Test
@@ -21,9 +23,17 @@ class TeluguSpeechTest {
 
     @Test
     void codesGetTheirOwnBeatInsideASentence() {
-        assertEquals("మీ విమానం, క్యూ ఆర్ ఏడు రెండు తొమ్మిది, గేట్, బి పన్నెండు, నుండి బయలుదేరుతుంది.",
+        assertEquals("మీ విమానం, క్యూ ఆర్ ఏడు రెండు తొమ్మిది, గేట్, బీ పన్నెండు, నుండి బయలుదేరుతుంది.",
                 TeluguSpeech.spokenForm("మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది."));
-        assertEquals("మళ్ళీ చెబుతున్నాను: గేట్, బి పన్నెండు.", TeluguSpeech.spokenForm("మళ్ళీ చెబుతున్నాను: గేట్ B12."));
+        assertEquals("మళ్ళీ చెబుతున్నాను: గేట్, బీ పన్నెండు.", TeluguSpeech.spokenForm("మళ్ళీ చెబుతున్నాను: గేట్ B12."));
+    }
+
+    @Test
+    void knownFlightCodesAreSpokenAsTheAirlineName() {
+        assertEquals("మీ విమానం ఎయిర్ ఇండియా గేట్, బీ పన్నెండు, నుండి బయలుదేరుతుంది.",
+                TeluguSpeech.spokenForm("మీ విమానం AI173 గేట్ B12 నుండి బయలుదేరుతుంది.", Map.of("AI173", "ఎయిర్ ఇండియా")));
+        assertEquals("మీ ఎయిర్ ఇండియా విమానం", TeluguSpeech.spokenForm("మీ ai173 విమానం", Map.of("AI173", "ఎయిర్ ఇండియా")));
+        assertEquals("ఎయిర్ ఇండియా, ఏ ఐ ఒకటి ఏడు నాలుగు", TeluguSpeech.spokenForm("AI173 AI174", Map.of("AI173", "ఎయిర్ ఇండియా")));
     }
 
     @Test

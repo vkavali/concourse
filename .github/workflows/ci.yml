@@ -15,9 +15,29 @@ jobs:
         with:
           fetch-depth: 0
       - name: Secret scan
+        id: gitleaks
         uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Report secret scan findings
+        if: steps.gitleaks.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "### Secret scan failed on $GITHUB_SHA"
+            echo
+            echo '```'
+            if [ -f results.sarif ]; then
+              jq -r '.runs[].results[] | "\(.ruleId)  \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine)  \(.message.text)"' results.sarif | head -40
+            else
+              echo "(no results.sarif — the scan failed before producing a report)"
+            fi
+            echo '```'
+          } > gitleaks-comment.md
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@gitleaks-comment.md >/dev/null
+          exit 1
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

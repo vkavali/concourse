@@ -26,6 +26,8 @@ public final class TeluguSpeech {
     /** Codes (letter+digit mixes) and standalone digit runs. Clock times like 03:45 are spoken by {@link #time}. */
     private static final Pattern CODE_OR_NUMBER = Pattern.compile("\\b(?:[A-Z0-9]*[A-Z][A-Z0-9]*\\d[A-Z0-9]*|\\d[A-Z0-9]*[A-Z][A-Z0-9]*|\\d+)\\b");
     private static final Pattern TIME = Pattern.compile("\\b([01]?\\d|2[0-3]):([0-5]\\d)\\b");
+    /** A lone capital letter between non-Latin text ("B గేట్లు") is a gate letter: say its name. */
+    private static final Pattern LONE_LETTER = Pattern.compile("(?<![A-Za-z0-9])([A-Z])(?![A-Za-z0-9])");
     private static final Pattern GATE_CODE = Pattern.compile("^([A-Z]{1,2})(\\d{1,2})([A-Z]?)$");
 
     /**
@@ -48,6 +50,7 @@ public final class TeluguSpeech {
                     .replaceAll(Matcher.quoteReplacement(e.getValue()));
         }
         String t = TIME.matcher(named).replaceAll(m -> time(Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2))));
+        t = LONE_LETTER.matcher(t).replaceAll(m -> Matcher.quoteReplacement(LETTERS.getOrDefault(m.group(1).charAt(0), m.group(1))));
         Matcher m = CODE_OR_NUMBER.matcher(t);
         StringBuilder out = new StringBuilder();
         while (m.find()) {

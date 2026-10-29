@@ -1,6 +1,7 @@
 package ai.concourse.whatsapp;
 
 import ai.concourse.common.PhoneHasher;
+import ai.concourse.evidence.SignEvidenceService;
 import ai.concourse.itinerary.ItinerarySummary;
 import ai.concourse.itinerary.TicketIngestService;
 import ai.concourse.journey.ContactEntity;
@@ -28,7 +29,7 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>Child (default role): ticket PDF/photo → itinerary; Confirm/Fix; a phone number → registers the traveler;
  *       "status"; dev commands "say …", "mode parent|child"; voice notes are transcribed and echoed (voice gate).</li>
- *   <li>Parent: voice notes and buttons go to {@link ParentTurnService}; typed text gets a 🎙 nudge.</li>
+ *   <li>Parent: voice notes and buttons go to {@link ParentTurnService}, photos to {@link SignEvidenceService}; typed text gets a 🎙 nudge.</li>
  * </ul>
  */
 @Component
@@ -45,12 +46,13 @@ public class MessageRouter implements InboundMessageHandler {
     private final ParentTurnService parentTurns;
     private final JourneyService journeys;
     private final JourneyController controller;
+    private final SignEvidenceService signs;
     private final PhoneHasher hasher;
     private final TtsClient tts;
 
     public MessageRouter(MessagingChannel whatsApp, ContactService contacts, TicketIngestService tickets,
                          VoiceNoteService voiceNotes, ParentTurnService parentTurns, JourneyService journeys,
-                         JourneyController controller, PhoneHasher hasher, TtsClient tts) {
+                         JourneyController controller, SignEvidenceService signs, PhoneHasher hasher, TtsClient tts) {
         this.whatsApp = whatsApp;
         this.contacts = contacts;
         this.tickets = tickets;
@@ -58,6 +60,7 @@ public class MessageRouter implements InboundMessageHandler {
         this.parentTurns = parentTurns;
         this.journeys = journeys;
         this.controller = controller;
+        this.signs = signs;
         this.hasher = hasher;
         this.tts = tts;
     }
@@ -71,7 +74,7 @@ public class MessageRouter implements InboundMessageHandler {
             switch (m.type()) {
                 case DOCUMENT, IMAGE -> {
                     if (role == ContactEntity.Role.PARENT) {
-                        whatsApp.sendText(from, "📷"); // placeholder until SignEvidenceService (Day 4)
+                        signs.handlePhoto(from, m.mediaId(), m.mimeType()); // a sign she photographed
                     } else {
                         tickets.ingest(from, m.mediaId(), m.mimeType(), m.text());
                     }

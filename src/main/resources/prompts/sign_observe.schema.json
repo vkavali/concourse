@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "is_airport_sign": { "type": "boolean", "description": "true if the photo shows airport signage, a gate sign, a flight screen or a counter sign" },
+    "visible_text": { "type": "array", "items": { "type": "string" }, "description": "readable printed text, uppercase as printed, one entry per line, reading order" },
+    "gate_codes": { "type": "array", "items": { "type": "string" }, "description": "gate references as printed: B12, B1-B20, or a bare letter B" },
+    "explicit_arrow": { "type": ["string", "null"], "enum": ["left", "right", "up", "down", "straight", null], "description": "the one arrow clearly attached to the main text, else null" },
+    "confidence": { "type": "number", "description": "0.0-1.0 that the text and gate codes are read correctly" },
+    "location_claim": { "type": "null", "description": "always null: the traveler's location is never inferred" }
+  },
+  "required": ["is_airport_sign", "visible_text", "gate_codes", "explicit_arrow", "confidence", "location_claim"]
+}

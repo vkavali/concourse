@@ -4,6 +4,7 @@ import ai.concourse.common.PhoneHasher;
 import ai.concourse.config.ConcourseProperties;
 import ai.concourse.itinerary.TicketIngestService;
 import ai.concourse.journey.ContactEntity;
+import ai.concourse.evidence.SignEvidenceService;
 import ai.concourse.journey.ContactService;
 import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
@@ -29,6 +30,7 @@ class MessageRouterTest {
     private final TtsClient tts = mock(TtsClient.class);
     private final ParentTurnService parentTurns = mock(ParentTurnService.class);
     private final JourneyController controller = mock(JourneyController.class);
+    private final SignEvidenceService signs = mock(SignEvidenceService.class);
     private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
     private MessageRouter router;
 
@@ -38,7 +40,7 @@ class MessageRouterTest {
 
     @BeforeEach
     void setUp() {
-        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, parentTurns, journeys, controller, hasher, tts);
+        router = new MessageRouter(whatsApp, contacts, tickets, voiceNotes, parentTurns, journeys, controller, signs, hasher, tts);
         when(contacts.roleOf(any())).thenReturn(ContactEntity.Role.CHILD);
     }
 
@@ -49,11 +51,11 @@ class MessageRouterTest {
     }
 
     @Test
-    void parentImageIsNotATicket() {
+    void parentImageIsASignPhotoNotATicket() {
         when(contacts.roleOf("17165550100")).thenReturn(ContactEntity.Role.PARENT);
         router.handle(msg(InboundMessage.Type.IMAGE, null, "m2", "image/jpeg", null));
         verify(tickets, never()).ingest(any(), any(), any(), any());
-        verify(whatsApp).sendText("17165550100", "📷");
+        verify(signs).handlePhoto("17165550100", "m2", "image/jpeg");
     }
 
     @Test

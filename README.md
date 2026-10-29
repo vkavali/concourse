@@ -33,6 +33,10 @@ with `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages`.
 
 Airport time zones come from the OpenFlights airports database (ODbL) — `src/main/resources/data/airports.csv`.
 
+## Travel Mode (her screen)
+
+After the intro and again after consent she gets a WhatsApp button **తెరవండి** that opens `travel.html#<journey>.<token>` in her phone browser: the current card, its voice, a live camera that reads the boards she points at (same reader and safety check as a WhatsApp photo), and the four buttons. Needs `PUBLIC_BASE_URL` set to the public HTTPS host (ngrok or Railway); the camera only works over HTTPS. The simulator shows the same link.
+
 ## Demo in ten minutes (one phone)
 
 1. Send the boarding pass → **Confirm**.

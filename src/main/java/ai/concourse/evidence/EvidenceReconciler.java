@@ -95,6 +95,13 @@ public final class EvidenceReconciler {
             }
         }
 
+        // 1b. A gate stage with no verified gate yet: nothing on a gate board can be confirmed.
+        if (target.stage().showsGateCard() && !target.isGate()) {
+            return new Verdict(Kind.IRRELEVANT, null, null,
+                    "మీ గేట్ ఇంకా చెప్పలేదు. పెద్ద స్క్రీన్ మీద మీ విమానం నంబర్ చూడండి, లేదా ఈ కార్డు సిబ్బందికి చూపించండి. గేట్ తెలియగానే నేను చెబుతాను.",
+                    "gate not on file yet; sign " + summaryOf(text) + " cannot be matched");
+        }
+
         // 2. The sign word for this stage (TRANSFER, BAGGAGE CLAIM, ...).
         for (String w : target.words()) {
             String want = w.toUpperCase(Locale.ROOT);
@@ -118,6 +125,11 @@ public final class EvidenceReconciler {
         return new Verdict(Kind.IRRELEVANT, null, null,
                 "ఈ బోర్డు మీ తర్వాతి పని గురించి కాదు. కార్డులో ఉన్న పదం ఉన్న బోర్డు కోసం చూడండి, లేదా ఈ కార్డు సిబ్బందికి చూపించండి.",
                 "sign not relevant to the next step (" + summary + ")");
+    }
+
+    private static String summaryOf(List<String> text) {
+        String joined = String.join(" | ", text);
+        return joined.length() > 60 ? joined.substring(0, 60) + "…" : joined;
     }
 
     /** "Go the way the arrow points: left." Only ever spoken for an arrow that was observed. */

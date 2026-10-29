@@ -74,7 +74,10 @@ public class ParentTurnService {
         this.mapper = mapper;
     }
 
-    /** Parent sent a voice note. */
+    /** What a turn produced: the outcome label for the log and the main Telugu line that was spoken. */
+    public record Reply(String outcome, String telugu, String intent) {}
+
+    /** Parent sent a voice note over WhatsApp. */
     public void handleVoiceNote(String parentWaId, String mediaId) {
         long t0 = System.currentTimeMillis();
         Optional<JourneyEntity> journey = journeys.latestForParent(hasher.hash(parentWaId));
@@ -82,14 +85,23 @@ public class ParentTurnService {
             messenger.speak(parentWaId, TeluguPhrases.NOT_SET_UP, null, null);
             return;
         }
-        JourneyEntity j = journey.get();
-        controller.onParentMessage(j);
-        JourneyFacts facts = messenger.facts(j);
-
         byte[] ogg = channel.downloadMedia(mediaId);
         long t1 = System.currentTimeMillis();
         byte[] wav = transcoder.toWav16kMono(ogg);
         long t2 = System.currentTimeMillis();
+        handleAudio(journey.get(), wav, "whatsapp", t0, t1, t2);
+    }
+
+    /** Her voice from anywhere (WhatsApp note, the travel screen's microphone), already converted to 16 kHz WAV. */
+    public Reply handleAudio(JourneyEntity j, byte[] wav, String source) {
+        long now = System.currentTimeMillis();
+        return handleAudio(j, wav, source, now, now, now);
+    }
+
+    private Reply handleAudio(JourneyEntity j, byte[] wav, String source, long t0, long t1, long t2) {
+        controller.onParentMessage(j);
+        JourneyFacts facts = messenger.facts(j);
+        String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);
         SttClient.Transcript transcript = stt.transcribeWav(wav, VoiceNoteService.PARENT_LANGUAGE_BIAS);
         long t3 = System.currentTimeMillis();
 
@@ -100,48 +112,69 @@ public class ParentTurnService {
         long t4 = System.currentTimeMillis();
 
         Map<String, Object> event = new LinkedHashMap<>();
+        event.put("source", source);
         event.put("audio_ms", transcript.audioDurationMs());
         event.put("transcript_chars", transcript.text().length());
+        Reply reply;
         if (turn == null || turn.needsClarification()) {
-            event.put("outcome", "clarify");
             if (turn != null) { event.put("intent", turn.intent()); event.put("confidence", turn.confidence()); }
-            messenger.speak(parentWaId, TeluguPhrases.CLARIFY, PARENT_BUTTONS, facts);
+            if (parentWaId != null) messenger.speak(parentWaId, TeluguPhrases.CLARIFY, PARENT_BUTTONS, facts);
+            reply = new Reply("clarify", TeluguPhrases.CLARIFY, turn == null ? "EMPTY" : turn.intent());
         } else {
             event.put("intent", turn.intent());
             event.put("confidence", turn.confidence());
             event.put("tool", turn.toolProposal());
-            event.put("outcome", respond(j, facts, parentWaId, turn));
+            reply = respond(j, facts, parentWaId, turn);
         }
+        event.put("outcome", reply.outcome());
         long t5 = System.currentTimeMillis();
         event.put("ms", Map.of("download", t1 - t0, "ffmpeg", t2 - t1, "stt", t3 - t2, "spark", t4 - t3, "tts_send", t5 - t4, "total", t5 - t0));
         eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "voice_turn", event);
-        log.info("parent turn {} ms (dl {} / ffmpeg {} / stt {} / spark {} / tts+send {}) outcome={}",
-                t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, event.get("outcome"));
+        log.info("parent turn {} ms (dl {} / ffmpeg {} / stt {} / spark {} / tts+send {}) outcome={} source={}",
+                t5 - t0, t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, reply.outcome(), source);
+        return reply;
     }
 
-    /** Spark classified the intent; code answers. Returns the outcome label for the event log. */
-    private String respond(JourneyEntity j, JourneyFacts facts, String parentWaId, ParentTurn turn) {
-        switch (turn.intent()) {
-            case "START_TRIP" -> { controller.recordConsent(j, "voice"); return "consent"; }
-            case "I_AM_HERE" -> { controller.markHere(j, "voice"); return "here"; }
-            case "AT_COUNTER" -> { controller.acknowledge(j, "voice: " + turn.englishGloss()); return "ack"; }
-            case "WHAT_NEXT" -> {
+    /** Spark classified the intent; code answers. Every "where do I go" answer ends with the camera button. */
+    private Reply respond(JourneyEntity j, JourneyFacts facts, String parentWaId, ParentTurn turn) {
+        String intent = turn.intent();
+        switch (intent) {
+            case "START_TRIP" -> {
+                boolean already = j.getConsentAt() != null;
+                controller.recordConsent(j, "voice");
+                return new Reply("consent", already ? StageText.ACK_THANKS : StageText.CONSENT_THANKS, intent);
+            }
+            case "I_AM_HERE" -> {
+                boolean complete = controller.markHere(j, "voice");
+                return new Reply("here", complete ? StageText.instruction(StageType.COMPLETE, facts, null, null) : TeluguPhrases.SON_TOLD, intent);
+            }
+            case "AT_COUNTER" -> {
+                controller.acknowledge(j, "voice: " + turn.englishGloss());
+                return new Reply("ack", StageText.ACK_THANKS, intent);
+            }
+            case "WHAT_NEXT", "LOST" -> {
                 String text = controller.whatNext(j);
                 if (j.getConsentAt() == null) {
                     messenger.speak(parentWaId, text, StageText.buttons(StageType.PRE_TRIP), facts);
-                } else {
-                    Optional<StageEntity> current = controller.current(j);
-                    StageType type = current.map(StageEntity::stageType).orElse(null);
-                    if (type != null && type.showsGateCard()) messenger.sendGateCard(parentWaId, facts, current.get().getSegmentSeq());
-                    else if (type != null) messenger.sendSignCard(parentWaId, type, facts, current.get().getSegmentSeq());
-                    messenger.speak(parentWaId, text, type == null ? null : StageText.buttons(type), facts);
+                    return new Reply("not_started", text, intent);
                 }
-                return "what_next";
+                Optional<StageEntity> current = controller.current(j);
+                StageType type = current.map(StageEntity::stageType).orElse(null);
+                if (type != null && type.showsGateCard()) messenger.sendGateCard(parentWaId, facts, current.get().getSegmentSeq());
+                else if (type != null) messenger.sendSignCard(parentWaId, type, facts, current.get().getSegmentSeq());
+                String spoken = "LOST".equals(intent) ? TeluguPhrases.LOST + " " + text : text;
+                messenger.speak(parentWaId, spoken, type == null ? null : StageText.buttons(type), facts);
+                messenger.sendCameraLink(j);
+                if ("LOST".equals(intent)) {
+                    messenger.notifyChild(j, "says she is lost", turn.englishGloss());
+                }
+                return new Reply("LOST".equals(intent) ? "lost" : "what_next", spoken, intent);
             }
             case "WHERE_IS_GATE" -> {
                 messenger.sendGateCard(parentWaId, facts);
-                messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
-                return "gate";
+                String text = messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+                messenger.sendCameraLink(j);
+                return new Reply("gate", text, intent);
             }
             default -> {
                 SafetyPolicy.Result checked = messenger.check(turn.replyTe(), facts);
@@ -150,7 +183,7 @@ public class ParentTurnService {
                 }
                 executeTool(turn, j, facts, parentWaId);
                 messenger.speak(parentWaId, checked.text(), null, facts);
-                return checked.ok() ? "replied" : "fallback";
+                return new Reply(checked.ok() ? "replied" : "fallback", checked.text(), intent);
             }
         }
     }

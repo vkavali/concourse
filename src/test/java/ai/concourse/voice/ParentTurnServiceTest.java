@@ -161,6 +161,39 @@ class ParentTurnServiceTest {
     }
 
     @Test
+    void lostGetsTheCardTheCameraButtonAndTellsTheChild() {
+        StageEntity current = new StageEntity();
+        current.setType(StageType.TRANSFER_ARRIVAL.name());
+        current.setSegmentSeq(1);
+        current.setAirport("DOH");
+        when(controller.current(journey)).thenReturn(Optional.of(current));
+        when(controller.whatNext(journey)).thenReturn("దోహాలో దిగాక: TRANSFER బోర్డులు చూస్తూ వెళ్ళండి.");
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "నేను తప్పిపోయాను ఎటు వెళ్ళాలి", 2000));
+        sparkReturns(new ParentTurn("LOST", null, 0.9, "none", "x", "I am lost, which way"));
+
+        service.handleVoiceNote(PARENT, "m1");
+
+        verify(channel).sendImage(eq(PARENT), any(), contains("TRANSFER"));
+        verify(channel).sendButtons(eq(PARENT), startsWith(TeluguPhrases.LOST), any());
+        verify(channel).sendLinkButton(eq(PARENT), eq(TeluguPhrases.CAMERA_LINK), eq(TeluguPhrases.CAMERA_LINK_BUTTON), endsWith(".cam"));
+        verify(channel).sendText(eq(CHILD), contains("says she is lost"));
+        verify(channel).sendText(eq(CHILD), contains("I do not know her physical location"));
+    }
+
+    @Test
+    void gateQuestionsEndWithTheCameraButtonAtMostOncePerMinute() {
+        service.handleButton(PARENT, ParentTurnService.BTN_GATE);
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "గేట్ ఎక్కడ", 2000));
+        sparkReturns(new ParentTurn("WHERE_IS_GATE", null, 0.95, "none", "x", "where is the gate"));
+        service.handleVoiceNote(PARENT, "m1");
+        service.handleVoiceNote(PARENT, "m1");
+        verify(channel, times(1)).sendLinkButton(eq(PARENT), any(), any(), endsWith(".cam"));
+        ParentTurnService.Reply r = service.handleAudio(journey, new byte[100], "travel");
+        assertEquals("gate", r.outcome());
+        assertTrue(r.telugu().contains("గేట్ B12"));
+    }
+
+    @Test
     void theVoiceSaysTheAirlineNameInsteadOfSpellingTheFlightCode() {
         when(tts.isConfigured()).thenReturn(true);
         when(tts.synthesizeOggOpus(any())).thenReturn(new byte[]{9});

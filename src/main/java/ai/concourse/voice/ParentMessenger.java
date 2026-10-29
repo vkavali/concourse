@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -74,6 +75,33 @@ public class ParentMessenger {
 
     public String travelUrl(JourneyEntity j) {
         return travelLinks.url(j.getId());
+    }
+
+    private final Map<java.util.UUID, Long> cameraLinkSentAt = new ConcurrentHashMap<>();
+    private final Map<java.util.UUID, Long> navigationAskAt = new ConcurrentHashMap<>();
+
+    /**
+     * "Tap to open the camera": the link button that lands straight in the camera view. Sent after every answer about
+     * where to go, at most once a minute so a burst of questions does not become a burst of buttons.
+     */
+    public void sendCameraLink(JourneyEntity j) {
+        navigationAskAt.put(j.getId(), System.currentTimeMillis());
+        Long last = cameraLinkSentAt.get(j.getId());
+        if (last != null && System.currentTimeMillis() - last < 60_000) return;
+        parentOf(j).ifPresent(p -> {
+            try {
+                channel.sendLinkButton(p.getE164(), TeluguPhrases.CAMERA_LINK, TeluguPhrases.CAMERA_LINK_BUTTON, travelLinks.url(j.getId()) + ".cam");
+                cameraLinkSentAt.put(j.getId(), System.currentTimeMillis());
+            } catch (RuntimeException e) {
+                log.warn("camera link not sent: {}", e.getMessage());
+            }
+        });
+    }
+
+    /** True for two minutes after she asked where to go — the travel screen switches itself to the camera. */
+    public boolean navigationAskedRecently(JourneyEntity j) {
+        Long at = navigationAskAt.get(j.getId());
+        return at != null && System.currentTimeMillis() - at < 120_000;
     }
 
     /** Voice note first (the thing she can use), then the same text and optional buttons. Returns the text actually sent. */

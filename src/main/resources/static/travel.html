@@ -19,6 +19,7 @@
   .btn { width:100%; padding:18px 14px; border-radius:14px; border:0; font-size:24px; font-weight:700; color:#fff; background:var(--navy); margin:8px 0; }
   .btn.alt { background:#e9eef8; color:var(--navy); }
   .btn.ok { background:var(--ok); } .btn.warn { background:var(--warn); }
+  #micBtn { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:none; }
   .row { display:flex; gap:8px; } .row .btn { flex:1; font-size:20px; padding:16px 8px; }
   #bar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid #ddd; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); }
   #cam { display:none; }
@@ -53,6 +54,8 @@
     <div class="en" id="english"></div>
     <button class="btn alt" onclick="replay()">🔊 మళ్ళీ వినండి</button>
     <button class="btn" onclick="toggleCam()" id="camBtn">📷 కెమెరా: బోర్డు చూపించండి</button>
+    <button class="btn warn" id="micBtn">🎤 నొక్కి పట్టుకుని మాట్లాడండి</button>
+    <div class="big" id="heard" style="display:none"></div>
   </section>
   <section id="cam">
     <div id="view">
@@ -81,7 +84,7 @@
 </div>
 
 <script>
-  const [JID, TOKEN] = (location.hash.replace('#','') || '.').split('.');
+  const [JID, TOKEN, MODE] = (location.hash.replace('#','') || '.').split('.');
   const api = p => `/travel/api/${JID}/${p}${p.includes('?') ? '&' : '?'}t=${TOKEN}`;
   const $ = id => document.getElementById(id);
   let state = null, version = null, player = new Audio(), camOn = false, stream = null, busy = false, lastClip = null, lastClipAt = 0, timer = null;
@@ -91,6 +94,7 @@
     try { player.src = ''; await player.play().catch(() => {}); } catch (e) {}   // unlock audio with this tap
     await refresh(true);
     setInterval(() => refresh(false), 8000);
+    if (MODE === 'cam') toggleCam();   // opened from "open the camera" on WhatsApp
   }
 
   async function refresh(force) {
@@ -113,7 +117,46 @@
       $('want').textContent = state.stage.shows_gate_card ? ('GATE ' + (state.stage.gate || '?')) : (state.stage.sign_word || '');
       if (state.audio) play(state.audio);
     }
+    // she just asked WhatsApp where to go while this screen was open: switch to the camera by ourselves
+    if (state.suggest === 'camera' && !camOn && document.visibilityState === 'visible') toggleCam();
   }
+
+  // ---- hold to talk: press, speak, release → Voice Transcribe → Spark → the same answer as WhatsApp
+  let rec = null, chunks = [], recMime = '';
+  const mic = $('micBtn');
+  async function startRec(e) {
+    e.preventDefault();
+    if (rec) return;
+    try {
+      const ms = await navigator.mediaDevices.getUserMedia({audio: true});
+      recMime = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+      rec = new MediaRecorder(ms, recMime ? {mimeType: recMime} : undefined);
+      chunks = [];
+      rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+      rec.onstop = () => { ms.getTracks().forEach(t => t.stop()); sendVoice(); };
+      rec.start();
+      mic.textContent = '🎙 వింటున్నాను… వదిలేస్తే పంపుతుంది';
+    } catch (err) { mic.textContent = '🎤 మైక్ అనుమతి ఇవ్వండి'; }
+  }
+  function stopRec(e) { if (e) e.preventDefault(); if (rec && rec.state !== 'inactive') rec.stop(); }
+  async function sendVoice() {
+    const blob = new Blob(chunks, {type: recMime || 'application/octet-stream'});
+    rec = null;
+    mic.textContent = '⏳ …';
+    try {
+      const r = await fetch(api('voice'), {method: 'POST', headers: {'Content-Type': recMime || 'application/octet-stream'}, body: blob});
+      const d = await r.json();
+      if (d.telugu) { $('heard').style.display = ''; $('heard').textContent = d.telugu; }
+      if (d.audio) play(d.audio);
+      if (d.camera && !camOn) toggleCam();
+      await refresh(true);
+    } catch (err) {}
+    mic.textContent = '🎤 నొక్కి పట్టుకుని మాట్లాడండి';
+  }
+  mic.addEventListener('pointerdown', startRec);
+  mic.addEventListener('pointerup', stopRec);
+  mic.addEventListener('pointerleave', stopRec);
+  mic.addEventListener('pointercancel', stopRec);
 
   function play(url) { try { player.pause(); player.src = url; player.play().catch(() => {}); } catch (e) {} }
   function replay() { if (state && state.audio) play(state.audio); }

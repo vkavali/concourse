@@ -15,6 +15,7 @@ import ai.concourse.safety.SafetyPolicy;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.Airlines;
 import ai.concourse.voice.ParentMessenger;
+import ai.concourse.voice.ParentTurnService;
 import ai.concourse.voice.StageText;
 import ai.concourse.voice.TeluguPhrases;
 import ai.concourse.voice.TeluguSpeech;
@@ -63,6 +64,7 @@ public class TravelController {
     private final AudioTranscoder transcoder;
     private final CardRenderer cards;
     private final SignCardRenderer signCards;
+    private final ParentTurnService parentTurns;
 
     private final Map<String, String> clips = new ConcurrentHashMap<>();       // clip id → Telugu text (verdicts)
     private final Map<String, byte[]> mp3 = new ConcurrentHashMap<>();         // text hash → mp3
@@ -70,7 +72,8 @@ public class TravelController {
 
     public TravelController(TravelLinks links, JourneyService journeys, JourneyController controller, ParentMessenger messenger,
                             SignEvidenceService signs, SafetyPolicy safety, TtsClient tts, AudioTranscoder transcoder,
-                            CardRenderer cards, SignCardRenderer signCards) {
+                            CardRenderer cards, SignCardRenderer signCards, ParentTurnService parentTurns) {
+        this.parentTurns = parentTurns;
         this.links = links;
         this.journeys = journeys;
         this.controller = controller;
@@ -125,6 +128,32 @@ public class TravelController {
         out.put("audio", tts.isConfigured() ? "/travel/api/" + id + "/audio/stage?t=" + token + "&v=" + hash(telugu).substring(0, 8) : null);
         out.put("card", "/travel/api/" + id + "/card?t=" + token + "&v=" + hash(type + "|" + (flight == null ? "" : flight.gate())).substring(0, 8));
         out.put("staff_card", messenger.staffCard(je, facts));
+        out.put("suggest", messenger.navigationAskedRecently(je) ? "camera" : null);
+        return ResponseEntity.ok(out);
+    }
+
+    // ---- hold to talk --------------------------------------------------------------------------------------------
+
+    /** Her voice from the screen's microphone: any browser recording → WAV → the same turn as a WhatsApp voice note. */
+    @PostMapping(value = "/voice", consumes = {"audio/*", MediaType.APPLICATION_OCTET_STREAM_VALUE, "video/webm"})
+    public ResponseEntity<?> voice(@PathVariable String id, @RequestParam("t") String token, @RequestBody byte[] audio) {
+        Optional<JourneyEntity> j = open(id, token);
+        if (j.isEmpty()) return forbidden();
+        if (audio == null || audio.length < 200) return ResponseEntity.badRequest().body(Map.of("error", "empty recording"));
+        long now = System.currentTimeMillis();
+        Long last = lastFrame.get(j.get().getId());
+        if (last != null && now - last < FRAME_GAP_MS) return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("retry_ms", FRAME_GAP_MS - (now - last)));
+        lastFrame.put(j.get().getId(), now);
+        byte[] wav = transcoder.toWav16kMono(audio);
+        ParentTurnService.Reply reply = parentTurns.handleAudio(j.get(), wav, "travel");
+        String clipId = hash(reply.telugu()).substring(0, 16);
+        clips.put(clipId, reply.telugu());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("outcome", reply.outcome());
+        out.put("intent", reply.intent());
+        out.put("telugu", reply.telugu());
+        out.put("audio", tts.isConfigured() ? "/travel/api/" + id + "/audio/" + clipId + "?t=" + token : null);
+        out.put("camera", reply.intent() != null && (reply.intent().equals("LOST") || reply.intent().equals("WHERE_IS_GATE") || reply.intent().equals("WHAT_NEXT")));
         return ResponseEntity.ok(out);
     }
 

@@ -25,6 +25,13 @@ public final class TeluguPhrases {
     public static final String TRAVEL_LINK = "కార్డు, వాయిస్, కెమెరా, అన్నీ ఒకే తెరపై. ఈ బటన్ నొక్కండి. నడిచేటప్పుడు ఆ తెర తెరిచే ఉంచండి.";
     public static final String TRAVEL_LINK_BUTTON = "తెరవండి";   // open
 
+    /** "Tap here; point the phone camera at the big board overhead; I will read it and tell you." */
+    public static final String CAMERA_LINK = "ఇక్కడ నొక్కి, పైన ఉన్న పెద్ద బోర్డు వైపు ఫోన్ కెమెరా చూపించండి. నేను చదివి చెబుతాను.";
+    public static final String CAMERA_LINK_BUTTON = "కెమెరా తెరవండి";   // open the camera
+
+    /** "No hurry. See the card. Point the camera at the board overhead and I will read it; if unsure, show the card to staff." */
+    public static final String LOST = "తొందర లేదు. కార్డు చూడండి. కింద బటన్ నొక్కి, పైన ఉన్న పెద్ద బోర్డు వైపు ఫోన్ కెమెరా చూపించండి, నేను చదివి చెబుతాను. తెలియకపోతే ఈ కార్డు సిబ్బందికి చూపించండి.";
+
     // Button titles (WhatsApp limit: 20 characters)
     public static final String BTN_GATE = "గేట్ ఎక్కడ?";      // Where is the gate?
     public static final String BTN_HELP = "సహాయం కావాలి";     // I need help

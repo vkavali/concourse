@@ -82,6 +82,7 @@ public class SignEvidenceService {
             else messenger.sendSignCard(parentWaId, a.stage(), a.facts(), a.segmentSeq());
         }
         messenger.speak(parentWaId, a.verdict().telugu(), null, a.factsWithArrow());
+        if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) messenger.sendCameraLink(j);
         long t3 = System.currentTimeMillis();
         log.info("sign turn {} ms (dl {} / spark {} / reply {}) verdict={} {}", t3 - t0, t1 - t0, a.sparkMs(), t3 - t1 - a.sparkMs(),
                 a.verdict().kind(), a.verdict().english());

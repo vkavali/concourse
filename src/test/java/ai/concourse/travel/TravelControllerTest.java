@@ -12,6 +12,9 @@ import ai.concourse.journey.JourneyRepository;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
+import ai.concourse.stt.SttClient;
+import ai.concourse.voice.ParentTurn;
+import ai.concourse.audio.Wav;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.whatsapp.InboundMessageHandler;
 import ai.concourse.whatsapp.WhatsAppClient;
@@ -52,6 +55,7 @@ class TravelControllerTest {
     @MockBean WhatsAppClient whatsApp;
     @MockBean TtsClient tts;
     @MockBean SparkClient spark;
+    @MockBean SttClient stt;
     @MockBean InboundMessageHandler handler;
 
     private JourneyEntity journey;
@@ -114,6 +118,20 @@ class TravelControllerTest {
                 .andExpect(jsonPath("$.telugu", containsString("ఎడమ వైపు")))
                 .andExpect(jsonPath("$.stage", is("WAITING_AT_ORIGIN")));
         mvc.perform(post(url("frame")).contentType(MediaType.IMAGE_JPEG).content(jpeg)).andExpect(status().isTooManyRequests());
+
+        // hold to talk: a recording from the screen takes the WhatsApp voice path and answers with the camera suggestion
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "నా గేట్ ఎక్కడ", 1200));
+        when(spark.completeJson(any(SparkRequest.class), eq(ParentTurn.class), any(ObjectMapper.class)))
+                .thenReturn(new ParentTurn("WHERE_IS_GATE", null, 0.95, "none", "x", "where is my gate"));
+        Thread.sleep(1600);
+        byte[] wav = Wav.write(16_000, new byte[2 * 16_000 / 2]);
+        mvc.perform(post(url("voice")).contentType("audio/wav").content(wav))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome", is("gate")))
+                .andExpect(jsonPath("$.telugu", containsString("గేట్ B12")))
+                .andExpect(jsonPath("$.camera", is(true)));
+        verify(whatsApp).sendLinkButton(eq(PARENT), any(), eq("కెమెరా తెరవండి"), org.mockito.ArgumentMatchers.endsWith(".cam"));
+        mvc.perform(get(url("state"))).andExpect(jsonPath("$.suggest", is("camera")));
 
         mvc.perform(post(url("action/help"))).andExpect(status().isOk()).andExpect(jsonPath("$.staff_card", containsString("Gate B12")));
         verify(whatsApp).sendText(eq(CHILD), contains("pressed HELP on the travel screen"));

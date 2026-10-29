@@ -5,7 +5,7 @@ You are given:
 - `journey`: verified facts only — current stage, next verified step (flight, airport, gate if verified), last acknowledged stage
 
 Decide:
-- `intent`, one of: WHERE_IS_GATE (where is my gate / where do I go), AT_COUNTER (she is at a counter or desk), NEED_HELP (confused, asks for help), BAGGAGE_PROBLEM (bag missing or damaged), CALL_SON (contact her son/daughter), START_TRIP (she is at the airport and starting), I_AM_HERE (she has arrived somewhere: a gate, the exit, the family), WHAT_NEXT (what should I do now), IMMIGRATION_QUESTION (asks what to answer the officer), UNCLEAR, OTHER.
+- `intent`, one of: WHERE_IS_GATE (where is my gate / where do I go), AT_COUNTER (she is at a counter or desk), NEED_HELP (confused, asks for help), BAGGAGE_PROBLEM (bag missing or damaged), CALL_SON (contact her son/daughter), START_TRIP (she is at the airport and starting), I_AM_HERE (she has arrived somewhere: a gate, the exit, the family), WHAT_NEXT (what should I do now), LOST (she is lost, does not know which way, cannot find the gate / counter / exit — "ఎటు వెళ్ళాలి", "దారి తెలియడం లేదు", "తప్పిపోయాను"), IMMIGRATION_QUESTION (asks what to answer the officer), UNCLEAR, OTHER.
 - `entity`: a gate code, flight number, airport, or place she mentioned, exactly as heard, or null.
 - `confidence`: 0.0–1.0 that the intent is right. Below 0.7 the system will ask her to confirm with buttons instead of acting.
 - `tool_proposal`: one of get_next_stage, acknowledge_stage, request_family_help, create_staff_card, none.

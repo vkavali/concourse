@@ -20,6 +20,7 @@ import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.ParentMessenger;
+import ai.concourse.voice.TeluguPhrases;
 import ai.concourse.whatsapp.MessagingChannel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -160,6 +161,6 @@ class SignEvidenceServiceTest {
         when(journeys.latestForParent(any())).thenReturn(Optional.empty());
         service.handlePhoto("910000000000", "img1", "image/jpeg");
         verifyNoInteractions(spark);
-        verify(channel).sendText(eq("910000000000"), contains("సిద్ధం కాలేదు"));
+        verify(channel).sendText("910000000000", TeluguPhrases.NOT_SET_UP);
     }
 }

@@ -10,6 +10,7 @@ concourse-data/
 *.ogg
 *.wav
 *.pdf
-!eval/tickets/sample-*.pdf   # synthetic demo itineraries only — never real tickets
+# synthetic demo itineraries only — never real tickets
+!eval/tickets/sample-*.pdf
 .DS_Store
 .idea/

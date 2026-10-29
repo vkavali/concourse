@@ -1,6 +1,7 @@
 package ai.concourse.travel;
 
 import ai.concourse.config.ConcourseProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
@@ -21,6 +22,7 @@ public class TravelLinks {
     private final byte[] key;
     private final String baseUrl;
 
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public TravelLinks(ConcourseProperties props) {
         this(props.phoneHashSalt(), props.publicBaseUrl());
     }

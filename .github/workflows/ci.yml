@@ -64,7 +64,9 @@ jobs:
             echo '-----'
             grep -nE -A25 "^[A-Za-z0-9_.]+ > .* FAILED" build.log | head -300
             echo '-----'
-            grep -nE "tests completed|BUILD|What went wrong|> Task .* FAILED|Caused by" build.log | head -40
+            grep -nE -A2 "Caused by:" build.log | grep -vE "^\S+-\s+at " | head -60
+            echo '-----'
+            grep -nE "tests completed|BUILD|What went wrong|> Task .* FAILED" build.log | head -40
             echo '```'
           } > comment.md
           gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@comment.md >/dev/null

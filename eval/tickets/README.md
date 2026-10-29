@@ -6,3 +6,6 @@ Collect 20 varied tickets / boarding passes / itinerary emails (redacted: no pas
 warnings raised. Critical fields must be 100% on supported formats; anything else gets listed as unsupported.
 
 Runner: `./gradlew bootRun --args='--spring.profiles.active=eval-tickets'` (Day 2) — until then use the WhatsApp path.
+
+`sample-itinerary-HYD-DOH-DFW.pdf` is a synthetic, future-dated two-leg itinerary (fictional passenger) for the demo and for
+rehearsing the journey engine; the stage plan needs future flight times, and real tickets never go in the repo.

@@ -18,13 +18,20 @@ set -a && source .env && set +a
 Expose `https://<host>/webhook/whatsapp` (Fly.io/Railway/ngrok) and register it in the Meta app's WhatsApp → Configuration
 with `WHATSAPP_VERIFY_TOKEN`; subscribe to `messages`.
 
-## Meta models used
+## Built on Meta
 
-| Need | Model | How |
+Every model decision in the journey is a Meta model; the channel is WhatsApp.
+
+| Need | Meta tool | How |
 |---|---|---|
-| Read tickets, classify intents, read signs | Muse Spark 1.3 (standard tier) | `POST /v1/chat/completions`, constrained JSON (`response_format: json_schema`), inline PDF/image |
-| Understand Telugu voice notes | Muse Voice Transcribe 1.0 | `POST /v1/asr/transcribe` (WAV 16 kHz mono), `languageBias: ["Telugu","English"]`, airport `keywords` |
-| Speak Telugu | MMS-TTS Telugu (`facebook/mms-tts-tel`, Meta open weights) | served on Modal — `modal/mms_tts.py` |
+| Reach a parent who only uses WhatsApp | **WhatsApp Business Cloud API** | webhooks in, voice notes (`voice: true`), images, 3-button replies, link buttons (`cta_url`), templates outside the 24-h window |
+| Read the ticket (PDF or a crumpled boarding-pass photo) | **Muse Spark 1.3** (Meta Model API, standard tier) | `/v1/chat/completions`, inline PDF/image, constrained JSON (`response_format: json_schema`) |
+| Understand her Telugu voice note | **Muse Voice Transcribe 1.0** | `/v1/asr/transcribe`, WAV 16 kHz mono, `languageBias: ["Telugu","English"]`, airport `keywords` |
+| Classify what she means (gate? help? son? start my trip?) | **Muse Spark 1.3** | intent + confidence + tool proposal; code decides and answers from verified facts |
+| Read the board she photographs, or points the camera at | **Muse Spark 1.3** (vision) | `visible_text`, `gate_codes`, one `explicit_arrow`; `location_claim` is typed null |
+| Speak Telugu | **MMS-TTS** (`facebook/mms-tts-tel`, Meta open weights) and **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, Meta open weights) | served from `modal/` — Meta has no TTS API, so its open models are the voice; Google Chirp 3 HD is wired only as a fallback switch (`TTS_PROVIDER=google`) if a real parent cannot follow the open voice |
+
+What is deliberately **not** a model: the journey state machine, the stage timing, the safety check on every outbound message, and the cards (drawn in code from verified facts). The sentence we are judged by: *Spark interprets the human; code controls the journey; Concourse never invents a direction.*
 
 ## Evals
 

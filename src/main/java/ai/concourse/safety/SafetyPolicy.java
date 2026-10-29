@@ -21,7 +21,7 @@ public class SafetyPolicy {
     private static final Logger log = LoggerFactory.getLogger(SafetyPolicy.class);
 
     /** "Please show this card to a staff member. I have told your son." */
-    public static final String FALLBACK_TE = "దయచేసి ఈ కార్డును సిబ్బందికి చూపించండి. నేను మీ కొడుకుకు చెప్పాను.";
+    public static final String FALLBACK_TE = "ఈ కార్డు అక్కడి సిబ్బందికి చూపించండి. మీ అబ్బాయికి నేను చెప్పాను.";
 
     /** Gate/terminal-looking tokens: B12, C-7, T2, D 40. Airline+number flight codes: QR729, AI 173, 6E203. */
     private static final Pattern CODE = Pattern.compile("\\b([A-Z]{1,2})\\s?-?(\\d{1,4})([A-Z]?)\\b");

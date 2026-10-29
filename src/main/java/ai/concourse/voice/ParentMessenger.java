@@ -104,7 +104,7 @@ public class ParentMessenger {
         JourneyFacts.Flight f = flight(facts, segmentSeq);
         if (f == null) return;
         try {
-            String caption = f.gate() == null ? "గేట్ ఇంకా ప్రకటించలేదు · " + f.flight() : "గేట్ " + f.gate() + " · " + f.flight();
+            String caption = f.gate() == null ? "గేట్ ఇంకా చెప్పలేదు · " + f.flight() : "గేట్ " + f.gate() + " · " + f.flight();
             channel.sendImage(to, cards.gateCard(f), caption);
         } catch (Exception e) {
             log.warn("gate card not sent: {}", e.getMessage());

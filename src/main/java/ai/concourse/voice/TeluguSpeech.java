@@ -108,6 +108,7 @@ public final class TeluguSpeech {
         return s.replaceAll("\\s+,", ",")             // "విమానం ," → "విమానం,"
                 .replaceAll("\\s*,\\s*,", ",")      // ", ," → ","
                 .replaceAll(",\\s*([.!?])", "$1")   // ", ." → "."
+                .replaceAll("([.!?:])\\s*,\\s*", "$1 ")  // ". , బీ" → ". బీ": a code opening a sentence needs no comma before it
                 .replaceAll("^\\s*,\\s*", "")       // leading comma
                 .replaceAll("\\s*,\\s*$", "")       // trailing comma
                 .replaceAll("\\s{2,}", " ")

@@ -38,27 +38,36 @@ public final class StageText {
         return CITY_TE.getOrDefault(iata, iata);
     }
 
+    /** "దోహాలో", "డల్లాస్‌లో": the locative joins the city, with a non-joiner after a pollu so the script does not fuse. */
+    static String in(String city) {
+        if (city == null || city.isEmpty()) return "";
+        return city + (city.endsWith("\u0C4D") ? "\u200C" : "") + "లో";
+    }
+
     /** The intro, sent once she is registered and the itinerary is confirmed. Ends with the consent request. */
     public static String intro(JourneyFacts facts) {
         JourneyFacts.Flight f = facts.firstFlight();
         JourneyFacts.Flight last = facts.flights().isEmpty() ? null : facts.flights().get(facts.flights().size() - 1);
-        String name = facts.travelerFirstName() == null || facts.travelerFirstName().isBlank() ? "" : facts.travelerFirstName() + " గారు, ";
+        String name = facts.travelerFirstName() == null || facts.travelerFirstName().isBlank() ? "" : " " + facts.travelerFirstName() + " గారు";
         String flight = f == null ? "మీ విమానం" : TeluguPhrases.yourFlight(f);
-        String route = f == null ? "" : " " + city(f.from()) + " నుండి " + city(last.to()) + " వరకు";
-        return "నమస్కారం. " + name + "నేను కాంకోర్స్. మీ కొడుకు మీ ప్రయాణం కోసం నన్ను ఏర్పాటు చేశారు. "
+        String route = f == null ? "" : ", " + city(f.from()) + " నుంచి " + city(last.to()) + " వరకు";
+        return "నమస్కారం" + name + ". నేను కాంకోర్స్. మీ అబ్బాయి మీ ప్రయాణం కోసం నన్ను పెట్టారు. "
                 + flight + route + ". "
-                + "ప్రతి అడుగులో నేను వాయిస్ నోట్ పంపుతాను. మీరు మాట్లాడి పంపవచ్చు, లేదా బోర్డు ఫోటో తీసి పంపవచ్చు. "
-                + "సిద్ధంగా ఉంటే, 'నా ప్రయాణం మొదలు' అని చెప్పి వాయిస్ నోట్ పంపండి, లేదా కింది బటన్ నొక్కండి.";
+                + "ఈ ప్రయాణంలో ఎప్పుడు ఏం చేయాలో నేనే చెబుతాను. ఏదైనా అడగాలంటే మాట్లాడి పంపండి, లేదా బోర్డు ఫోటో తీసి పంపండి. "
+                + "సిద్ధంగా ఉంటే 'నా ప్రయాణం మొదలు' అని చెప్పండి, లేదా కింద బటన్ నొక్కండి.";
     }
 
-    /** "Thank you. Your trip has started. I will tell you when it is time for each step." */
-    public static final String CONSENT_THANKS = "ధన్యవాదాలు. మీ ప్రయాణం మొదలైంది. ప్రతి అడుగుకు సమయం వచ్చినప్పుడు నేను చెబుతాను. ఫోన్ దగ్గరే ఉంచుకోండి.";
+    /** "All right. Your trip has started. I will tell you what to do, when it is time. Keep the phone with you." */
+    public static final String CONSENT_THANKS = "సరే. మీ ప్రయాణం మొదలైంది. ఎప్పుడు ఏం చేయాలో సమయానికి నేను చెబుతాను. ఫోన్ దగ్గరే ఉంచుకోండి.";
 
-    /** "Noted. I will tell you the next step when it is time." */
-    public static final String ACK_THANKS = "సరే. తర్వాతి అడుగు సమయం వచ్చినప్పుడు చెబుతాను.";
+    /** "All right. I will tell you what to do next when it is time." */
+    public static final String ACK_THANKS = "సరే. తర్వాత ఏం చేయాలో సమయం వచ్చినప్పుడు చెబుతాను.";
 
-    /** "Not started yet: say 'start my trip' or press the button." */
-    public static final String NOT_STARTED = "మీ ప్రయాణం ఇంకా మొదలు కాలేదు. 'నా ప్రయాణం మొదలు' అని చెప్పి వాయిస్ నోట్ పంపండి, లేదా కింది బటన్ నొక్కండి.";
+    /** "Your trip has not started yet: say 'start my trip', or press the button below." */
+    public static final String NOT_STARTED = "మీ ప్రయాణం ఇంకా మొదలు కాలేదు. 'నా ప్రయాణం మొదలు' అని చెప్పండి, లేదా కింద బటన్ నొక్కండి.";
+
+    /** "Look for boards with the word on the card as you go." */
+    private static final String FOLLOW_CARD = "కార్డులో ఉన్న పదం ఉన్న బోర్డులు చూస్తూ వెళ్ళండి.";
 
     /** The instruction for a stage, from verified facts only. */
     public static String instruction(StageType type, JourneyFacts facts, Integer segmentSeq, String airport) {
@@ -69,33 +78,35 @@ public final class StageText {
         String here = city(airport);
         return switch (type) {
             case PRE_TRIP -> intro(facts);
-            case CHECK_IN -> "ఇప్పుడు ఎయిర్‌పోర్ట్ లోపల " + airlineOrFlight(f) + " కౌంటర్ కి వెళ్ళండి. "
-                    + "పాస్‌పోర్ట్, టికెట్ చూపించండి. పెద్ద బ్యాగ్ ఇవ్వండి. బోర్డింగ్ పాస్ తీసుకోండి. "
+            case CHECK_IN -> "ఇప్పుడు ఎయిర్‌పోర్ట్ లోపల " + airlineOrFlight(f) + " కౌంటర్ దగ్గరకి వెళ్ళండి. " + FOLLOW_CARD + " "
+                    + "కౌంటర్లో పాస్‌పోర్ట్, టికెట్ ఇవ్వండి. పెద్ద బ్యాగ్ అక్కడే ఇచ్చేయండి. బోర్డింగ్ పాస్ తీసుకోండి. "
                     + "అయ్యాక 'అయ్యింది' బటన్ నొక్కండి.";
-            case SECURITY -> "ఇప్పుడు సెక్యూరిటీ చెక్ కి వెళ్ళండి. 'Security' అని రాసిన బోర్డులను అనుసరించండి. "
-                    + "చేతి బ్యాగ్, ఫోన్ ట్రేలో పెట్టండి. పాస్‌పోర్ట్, బోర్డింగ్ పాస్ చేతిలో ఉంచుకోండి. అయ్యాక 'అయ్యింది' నొక్కండి.";
+            case SECURITY -> "ఇప్పుడు సెక్యూరిటీ చెక్\u200Cకి వెళ్ళండి. " + FOLLOW_CARD + " "
+                    + "చేతి బ్యాగ్, ఫోన్ ట్రేలో పెట్టండి. పాస్‌పోర్ట్, బోర్డింగ్ పాస్ చేతిలోనే ఉంచుకోండి. అయ్యాక 'అయ్యింది' నొక్కండి.";
             case WAITING_AT_ORIGIN, TRANSFER_WAITING -> gate == null
-                    ? flight + " గేట్ ఇంకా ప్రకటించలేదు. పెద్ద స్క్రీన్ చూడండి, లేదా ఈ కార్డును సిబ్బందికి చూపించండి. గేట్ తెలిశాక నేను చెబుతాను."
-                    : flight + " గేట్ " + gate + ". మళ్ళీ చెబుతున్నాను: గేట్ " + gate + ". గేట్ " + gate + " అని రాసిన బోర్డులను అనుసరించండి. కార్డు చూడండి. గేట్ దగ్గర కూర్చోండి.";
-            case BOARDING_ORIGIN, TRANSFER_BOARDING -> (gate == null ? "బోర్డింగ్ త్వరలో మొదలవుతుంది. " : "గేట్ " + gate + " దగ్గర బోర్డింగ్ త్వరలో మొదలవుతుంది. ")
+                    ? flight + " గేట్ ఇంకా చెప్పలేదు. పెద్ద స్క్రీన్ మీద చూడండి, లేదా ఈ కార్డు సిబ్బందికి చూపించండి. గేట్ తెలియగానే నేను చెబుతాను."
+                    : flight + " గేట్ " + gate + ". మళ్ళీ చెబుతున్నాను: గేట్ " + gate + ". కార్డు చూడండి. " + gate + " అని ఉన్న బోర్డులు చూస్తూ వెళ్ళండి. "
+                    + "గేట్ దగ్గర కూర్చోండి. తెలియకపోతే కార్డు సిబ్బందికి చూపించండి.";
+            case BOARDING_ORIGIN, TRANSFER_BOARDING -> (gate == null ? "బోర్డింగ్ ఇప్పుడు మొదలవుతుంది. " : "గేట్ " + gate + " దగ్గర బోర్డింగ్ ఇప్పుడు మొదలవుతుంది. ")
                     + "పాస్‌పోర్ట్, బోర్డింగ్ పాస్ చేతిలో ఉంచుకోండి. సిబ్బంది పిలిచినప్పుడు లైన్‌లో నిలబడండి.";
-            case IN_FLIGHT -> flight + " బయలుదేరే సమయం. ఫోన్ ఫ్లైట్ మోడ్ లో పెట్టండి. "
-                    + (to.isEmpty() ? "" : to + " లో దిగాక ఫోన్ ఆన్ చేయండి. ") + "అప్పుడు నేను మళ్ళీ చెబుతాను. మంచి ప్రయాణం.";
-            case TRANSFER_ARRIVAL -> here + " లో దిగిన తర్వాత: తొందర లేదు. ఫోన్ ఆన్ చేయండి. "
-                    + "'Transfer' లేదా 'Connections' అని రాసిన బోర్డులను అనుసరించండి. బయటకు వెళ్ళకండి. బ్యాగ్ తీసుకోవద్దు.";
+            case IN_FLIGHT -> flight + " బయలుదేరే సమయం అయింది. ఫోన్ ఫ్లైట్ మోడ్‌లో పెట్టండి. "
+                    + (to.isEmpty() ? "" : in(to) + " దిగాక ఫోన్ ఆన్ చేయండి, ") + "అప్పుడు నేను మళ్ళీ చెబుతాను. ప్రయాణం బాగా జరగాలి.";
+            case TRANSFER_ARRIVAL -> in(here) + " దిగాక: తొందర లేదు. ఫోన్ ఆన్ చేయండి. కార్డులో ఉన్న పదం, TRANSFER, ఉన్న బోర్డులు చూస్తూ వెళ్ళండి. "
+                    + "బయటకి వెళ్ళకండి, బ్యాగ్ తీసుకోవద్దు. ఏ బోర్డు అయినా అర్థం కాకపోతే ఫోటో తీసి పంపండి.";
             case TRANSFER_FIND_GATE -> gate == null
-                    ? "మీ తర్వాతి విమానం " + airlineOrFlight(f) + ". గేట్ ఇంకా ప్రకటించలేదు. 'Transfer' బోర్డులను అనుసరించి పెద్ద స్క్రీన్ చూడండి, లేదా ఈ కార్డును సిబ్బందికి చూపించండి."
-                    : "మీ తర్వాతి విమానం " + airlineOrFlight(f) + ". గేట్ " + gate + ". మళ్ళీ చెబుతున్నాను: గేట్ " + gate + ". 'Transfer' బోర్డులు, తర్వాత గేట్ " + gate + " బోర్డులను అనుసరించండి. కార్డు చూడండి.";
-            case US_ARRIVAL -> here + " లో దిగిన తర్వాత: ఫోన్ ఆన్ చేయండి. 'Arrivals' లేదా 'Immigration' అని రాసిన బోర్డులను అనుసరించండి. "
-                    + "ఆఫీసర్ ప్రశ్నలకు మీరే సమాధానం చెప్పండి. ఫోన్ అడిగితేనే చూపించండి.";
+                    ? "మీ తర్వాతి విమానం " + airlineOrFlight(f) + ". గేట్ ఇంకా చెప్పలేదు. TRANSFER బోర్డులు చూస్తూ వెళ్ళి పెద్ద స్క్రీన్ మీద చూడండి, లేదా ఈ కార్డు సిబ్బందికి చూపించండి."
+                    : "మీ తర్వాతి విమానం " + airlineOrFlight(f) + ". గేట్ " + gate + ". మళ్ళీ చెబుతున్నాను: గేట్ " + gate + ". "
+                    + "ముందు TRANSFER బోర్డులు, తర్వాత " + gate + " అని ఉన్న బోర్డులు చూస్తూ వెళ్ళండి. కార్డు చూడండి.";
+            case US_ARRIVAL -> in(here) + " దిగాక: ఫోన్ ఆన్ చేయండి. కార్డులో ఉన్న పదాలు, ARRIVALS, IMMIGRATION, ఉన్న బోర్డులు చూస్తూ వెళ్ళండి. "
+                    + "ఆఫీసర్ అడిగే ప్రశ్నలకు మీరే సమాధానం చెప్పండి. ఫోన్ అడిగితేనే చూపించండి.";
             case IMMIGRATION -> "ఇమ్మిగ్రేషన్ లైన్‌లో నిలబడండి. పాస్‌పోర్ట్ చేతిలో ఉంచుకోండి. ఆఫీసర్ అడిగినవి మీరే చెప్పండి. "
                     + "సహాయం కావాలంటే 'సహాయం కావాలి' నొక్కండి, కార్డు చూపించండి. అయ్యాక 'అయ్యింది' నొక్కండి.";
-            case BAGGAGE -> "ఇప్పుడు 'Baggage Claim' అని రాసిన బోర్డులను అనుసరించండి. స్క్రీన్ మీద "
-                    + (f == null ? "మీ విమానం నంబర్" : f.flight()) + " చూసి ఆ బెల్ట్ దగ్గర బ్యాగ్ తీసుకోండి. అయ్యాక 'అయ్యింది' నొక్కండి.";
-            case EXIT -> "బ్యాగ్ తీసుకున్నాక 'Exit' అని రాసిన బోర్డులను అనుసరించండి. బయట మీ కొడుకు ఉంటారు. "
-                    + "బయటకు వచ్చాక 'నేను వచ్చాను' నొక్కండి.";
-            case FAMILY_HANDOFF -> "బయటకు వచ్చారా? 'నేను వచ్చాను' నొక్కండి. మీ కొడుకుకు నేను చెబుతాను. ఇంకా రాకపోతే 'కొడుకుకు చెప్పు' నొక్కండి.";
-            case COMPLETE -> "మీ ప్రయాణం పూర్తయింది. మీ కొడుకుకు చెప్పాను. నమస్కారం.";
+            case BAGGAGE -> "ఇప్పుడు BAGGAGE CLAIM బోర్డులు చూస్తూ వెళ్ళండి. స్క్రీన్ మీద "
+                    + (f == null ? "మీ విమానం నంబర్" : f.flight()) + " చూసి, ఆ బెల్ట్ దగ్గర మీ బ్యాగ్ తీసుకోండి. అయ్యాక 'అయ్యింది' నొక్కండి.";
+            case EXIT -> "బ్యాగ్ తీసుకున్నాక EXIT బోర్డులు చూస్తూ బయటకి రండి. బయట మీ అబ్బాయి ఉంటారు. "
+                    + "బయటకి వచ్చాక 'నేను వచ్చాను' నొక్కండి.";
+            case FAMILY_HANDOFF -> "బయటకి వచ్చారా? 'నేను వచ్చాను' నొక్కండి, మీ అబ్బాయికి చెబుతాను. ఆయన ఇంకా కనిపించకపోతే 'అబ్బాయికి చెప్పు' నొక్కండి.";
+            case COMPLETE -> "మీ ప్రయాణం పూర్తయింది. మీ అబ్బాయికి చెప్పాను. నమస్కారం.";
         };
     }
 

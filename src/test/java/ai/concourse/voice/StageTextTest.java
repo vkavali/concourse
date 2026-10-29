@@ -44,8 +44,8 @@ class StageTextTest {
         assertTrue(transfer.contains("గేట్ C7"), transfer);
         assertFalse(transfer.contains("B12"), "the transfer stage speaks of the second flight only");
         String unknown = StageText.instruction(StageType.WAITING_AT_ORIGIN, NO_GATES, 1, "DEL");
-        assertTrue(unknown.contains("గేట్ ఇంకా ప్రకటించలేదు"), unknown);
-        assertTrue(StageText.instruction(StageType.IN_FLIGHT, FACTS, 1, "HYD").contains("దోహా లో దిగాక"));
+        assertTrue(unknown.contains("గేట్ ఇంకా చెప్పలేదు"), unknown);
+        assertTrue(StageText.instruction(StageType.IN_FLIGHT, FACTS, 1, "HYD").contains("దోహాలో దిగాక"));
     }
 
     @Test

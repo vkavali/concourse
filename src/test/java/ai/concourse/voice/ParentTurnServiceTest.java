@@ -110,7 +110,7 @@ class ParentTurnServiceTest {
         service.handleVoiceNote(PARENT, "m1");
 
         String expected = TeluguPhrases.gateAnswer(facts());
-        assertTrue(expected.startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్ B12 నుండి"), expected);
+        assertTrue(expected.startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్ B12 నుంచి"), expected);
         verify(channel).sendText(PARENT, expected);
         verify(channel, never()).sendText(PARENT, "మీ విమానం QR729 గేట్ B12 నుండి బయలుదేరుతుంది.");
         verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
@@ -166,7 +166,7 @@ class ParentTurnServiceTest {
         service.handleButton(PARENT, ParentTurnService.BTN_GATE);
         ArgumentCaptor<String> spoken = ArgumentCaptor.forClass(String.class);
         verify(tts).synthesizeOggOpus(spoken.capture());
-        assertTrue(spoken.getValue().startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్, బీ పన్నెండు, నుండి"), spoken.getValue());
+        assertTrue(spoken.getValue().startsWith("మీ ఖతార్ ఎయిర్‌వేస్ విమానం గేట్, బీ పన్నెండు, నుంచి"), spoken.getValue());
         assertFalse(spoken.getValue().contains("క్యూ ఆర్"), "flight code is not spelled when the airline is known");
     }
 

@@ -77,7 +77,7 @@ public class CardRenderer {
         g.setColor(INK);
         fit(g, "I speak Telugu, not English. Please help me find this gate.", latin, 42f, 975);
         g.setColor(GREY);
-        fit(g, "ఈ కార్డును సిబ్బందికి చూపించండి", telugu, 36f, 1045); // "show this card to staff" — for her
+        fit(g, "ఈ కార్డు అక్కడి సిబ్బందికి చూపించండి", telugu, 36f, 1045); // "show this card to staff" — for her
         g.dispose();
 
         try {

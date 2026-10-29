@@ -52,7 +52,7 @@ public final class EvidenceReconciler {
     public static Verdict reconcile(SignObservation o, Target target) {
         if (o == null || !o.readable()) {
             return new Verdict(Kind.UNREADABLE, null, null,
-                    "ఈ ఫోటోలో బోర్డు సరిగ్గా కనిపించడం లేదు. బోర్డుకు కొంచెం దగ్గరగా వెళ్ళి, మళ్ళీ ఫోటో తీసి పంపండి.",
+                    "ఈ ఫోటోలో బోర్డు సరిగ్గా కనిపించలేదు. బోర్డుకి కొంచెం దగ్గరగా వెళ్ళి మళ్ళీ ఫోటో తీసి పంపండి.",
                     "photo unreadable; asked for a closer one");
         }
         String arrow = o.explicitArrow() == null || o.explicitArrow().isBlank() ? null : o.explicitArrow().toLowerCase(Locale.ROOT);
@@ -89,8 +89,8 @@ public final class EvidenceReconciler {
             }
             if (!otherLetters.isEmpty()) {
                 return new Verdict(Kind.MISMATCH, String.join(",", otherLetters), null,
-                        "ఈ బోర్డు మీద మీ గేట్ లేదు — ఇవి వేరే గేట్లు. మీ గేట్ " + target.gate() + ". "
-                                + spellLetter(letter) + " అక్షరం ఉన్న బోర్డు కోసం చూడండి. తెలియకపోతే ఈ కార్డు సిబ్బందికి చూపించండి.",
+                        "ఈ బోర్డు మీద మీ గేట్ లేదు, ఇవి వేరే గేట్లు. మీ గేట్ " + target.gate() + ". "
+                                + spellLetter(letter) + " అని ఉన్న బోర్డు కోసం చూడండి. తెలియకపోతే ఈ కార్డు సిబ్బందికి చూపించండి.",
                         "sign shows other gates (" + String.join(",", otherLetters) + "); her gate is " + target.gate());
             }
         }
@@ -102,7 +102,7 @@ public final class EvidenceReconciler {
             for (String line : text) {
                 if (line.contains(want) || (want.contains(" ") && line.contains(want.split(" ")[0]))) {
                     return new Verdict(Kind.MATCH, want, arrow,
-                            "ఈ బోర్డు మీద మీకు కావలసిన పదం ఉంది. " + follow(arrow) + " ఇదే బోర్డులను చూస్తూ వెళ్ళండి.",
+                            "ఈ బోర్డు మీద మీకు కావలసిన పదం ఉంది. " + follow(arrow) + " ఇలాంటి బోర్డులు చూస్తూ వెళ్ళండి.",
                             "sign shows " + want + (arrow == null ? "" : ", arrow " + arrow));
                 }
             }
@@ -124,10 +124,10 @@ public final class EvidenceReconciler {
     static String follow(String arrow) {
         if (arrow == null) return "ఆ బోర్డు చూపించే వైపు వెళ్ళండి.";
         return switch (arrow) {
-            case "left" -> "బాణం ఎడమ వైపు చూపిస్తోంది. ఎడమ వైపు వెళ్ళండి.";
-            case "right" -> "బాణం కుడి వైపు చూపిస్తోంది. కుడి వైపు వెళ్ళండి.";
-            case "up", "straight" -> "బాణం ముందుకు చూపిస్తోంది. నేరుగా వెళ్ళండి.";
-            case "down" -> "బాణం కిందకి చూపిస్తోంది. మెట్లు లేదా లిఫ్ట్ తో కిందకి వెళ్ళండి.";
+            case "left" -> "బాణం ఎడమ వైపు చూపిస్తోంది, ఎడమ వైపు వెళ్ళండి.";
+            case "right" -> "బాణం కుడి వైపు చూపిస్తోంది, కుడి వైపు వెళ్ళండి.";
+            case "up", "straight" -> "బాణం ముందుకు చూపిస్తోంది, నేరుగా వెళ్ళండి.";
+            case "down" -> "బాణం కిందకి చూపిస్తోంది, మెట్లు లేదా లిఫ్ట్‌లో కిందకి వెళ్ళండి.";
             default -> "ఆ బోర్డు చూపించే వైపు వెళ్ళండి.";
         };
     }

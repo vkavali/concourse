@@ -314,6 +314,7 @@ public class JourneyController {
         finishJob(stage, OutboundJobEntity.SENT, null);
         try {
             if (type.showsGateCard()) messenger.sendGateCard(parent, facts, stage.getSegmentSeq());
+            else messenger.sendSignCard(parent, type, facts, stage.getSegmentSeq());
             String text = StageText.instruction(type, facts, stage.getSegmentSeq(), stage.getAirport());
             messenger.speak(parent, text, StageText.buttons(type), facts);
             eventLog.record(j.getId(), EventLog.ACTOR_SYSTEM, "stage_sent", Map.of("stage", type.name(), "seq", stage.getSeq(),

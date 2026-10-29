@@ -2,6 +2,7 @@ package ai.concourse.voice;
 
 import ai.concourse.audio.AudioTranscoder;
 import ai.concourse.card.CardRenderer;
+import ai.concourse.card.SignCardRenderer;
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.config.ConcourseProperties;
 import ai.concourse.itinerary.Airports;
@@ -60,7 +61,7 @@ class ParentTurnServiceTest {
 
     @BeforeEach
     void setUp() {
-        messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, contacts, journeys, new Airports());
+        messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, new SignCardRenderer(), contacts, journeys, new Airports());
         service = new ParentTurnService(channel, transcoder, stt, spark, new PromptLoader(mapper), journeys, controller,
                 messenger, hasher, eventLog, mapper);
         when(cards.gateCard(any())).thenReturn(new byte[]{0x50, 0x4E, 0x47});

@@ -1,6 +1,8 @@
 package ai.concourse.voice;
 
 import ai.concourse.card.CardRenderer;
+import ai.concourse.card.SignCardRenderer;
+import ai.concourse.journey.StageType;
 import ai.concourse.itinerary.Airports;
 import ai.concourse.journey.ContactEntity;
 import ai.concourse.journey.ContactService;
@@ -34,6 +36,7 @@ public class ParentMessenger {
     private final TtsClient tts;
     private final SafetyPolicy safety;
     private final CardRenderer cards;
+    private final SignCardRenderer signs;
     private final ContactService contacts;
     private final JourneyService journeys;
     private final Airports airports;
@@ -43,12 +46,13 @@ public class ParentMessenger {
         return t;
     });
 
-    public ParentMessenger(MessagingChannel channel, TtsClient tts, SafetyPolicy safety, CardRenderer cards,
+    public ParentMessenger(MessagingChannel channel, TtsClient tts, SafetyPolicy safety, CardRenderer cards, SignCardRenderer signs,
                            ContactService contacts, JourneyService journeys, Airports airports) {
         this.channel = channel;
         this.tts = tts;
         this.safety = safety;
         this.cards = cards;
+        this.signs = signs;
         this.contacts = contacts;
         this.journeys = journeys;
         this.airports = airports;
@@ -109,6 +113,20 @@ public class ParentMessenger {
 
     public void sendGateCard(String to, JourneyFacts facts) {
         sendGateCard(to, facts, null);
+    }
+
+    /** The sign card for a stage (the English board word to match), if the stage has one. Returns whether one was sent. */
+    public boolean sendSignCard(String to, StageType type, JourneyFacts facts, Integer segmentSeq) {
+        JourneyFacts.Flight f = flight(facts, segmentSeq);
+        SignCardRenderer.Spec spec = SignCardRenderer.specFor(type, f);
+        if (spec == null) return false;
+        try {
+            channel.sendImage(to, signs.signCard(type, f), "ఈ బోర్డు కోసం చూడండి · " + spec.word());
+            return true;
+        } catch (Exception e) {
+            log.warn("sign card not sent: {}", e.getMessage());
+            return false;
+        }
     }
 
     /** Plain English to the child. Never a location claim. */

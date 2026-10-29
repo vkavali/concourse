@@ -133,6 +133,7 @@ public class ParentTurnService {
                     Optional<StageEntity> current = controller.current(j);
                     StageType type = current.map(StageEntity::stageType).orElse(null);
                     if (type != null && type.showsGateCard()) messenger.sendGateCard(parentWaId, facts, current.get().getSegmentSeq());
+                    else if (type != null) messenger.sendSignCard(parentWaId, type, facts, current.get().getSegmentSeq());
                     messenger.speak(parentWaId, text, type == null ? null : StageText.buttons(type), facts);
                 }
                 return "what_next";

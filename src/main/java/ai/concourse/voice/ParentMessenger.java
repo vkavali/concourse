@@ -10,6 +10,7 @@ import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyFacts;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.safety.SafetyPolicy;
+import ai.concourse.travel.TravelLinks;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.whatsapp.MessagingChannel;
 import ai.concourse.whatsapp.WhatsAppClient;
@@ -40,6 +41,7 @@ public class ParentMessenger {
     private final ContactService contacts;
     private final JourneyService journeys;
     private final Airports airports;
+    private final TravelLinks travelLinks;
     private final ExecutorService warmer = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "tts-prewarm");
         t.setDaemon(true);
@@ -47,7 +49,7 @@ public class ParentMessenger {
     });
 
     public ParentMessenger(MessagingChannel channel, TtsClient tts, SafetyPolicy safety, CardRenderer cards, SignCardRenderer signs,
-                           ContactService contacts, JourneyService journeys, Airports airports) {
+                           ContactService contacts, JourneyService journeys, Airports airports, TravelLinks travelLinks) {
         this.channel = channel;
         this.tts = tts;
         this.safety = safety;
@@ -56,6 +58,22 @@ public class ParentMessenger {
         this.contacts = contacts;
         this.journeys = journeys;
         this.airports = airports;
+        this.travelLinks = travelLinks;
+    }
+
+    /** The Travel Mode link as a tappable button: "card, voice and camera on one screen — tap to open". */
+    public void sendTravelLink(JourneyEntity j) {
+        parentOf(j).ifPresent(p -> {
+            try {
+                channel.sendLinkButton(p.getE164(), TeluguPhrases.TRAVEL_LINK, TeluguPhrases.TRAVEL_LINK_BUTTON, travelLinks.url(j.getId()));
+            } catch (RuntimeException e) {
+                log.warn("travel link not sent: {}", e.getMessage());
+            }
+        });
+    }
+
+    public String travelUrl(JourneyEntity j) {
+        return travelLinks.url(j.getId());
     }
 
     /** Voice note first (the thing she can use), then the same text and optional buttons. Returns the text actually sent. */

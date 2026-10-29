@@ -18,6 +18,7 @@ import ai.concourse.safety.SafetyPolicy;
 import ai.concourse.spark.PromptLoader;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
+import ai.concourse.travel.TravelLinks;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.ParentMessenger;
 import ai.concourse.voice.TeluguPhrases;
@@ -58,7 +59,7 @@ class SignEvidenceServiceTest {
 
     @BeforeEach
     void setUp() {
-        ParentMessenger messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, new SignCardRenderer(), contacts, journeys, new Airports());
+        ParentMessenger messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, new SignCardRenderer(), contacts, journeys, new Airports(), new TravelLinks("salt", "http://x"));
         service = new SignEvidenceService(channel, spark, new PromptLoader(mapper), journeys, controller, messenger, hasher, eventLog);
         when(cards.gateCard(any())).thenReturn(new byte[]{1});
         journey = new JourneyEntity();

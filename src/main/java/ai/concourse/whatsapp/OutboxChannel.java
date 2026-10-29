@@ -55,6 +55,12 @@ public class OutboxChannel implements MessagingChannel {
     }
 
     @Override
+    public String sendLinkButton(String to, String body, String buttonText, String url) {
+        record(to, "link", body, List.of(buttonText), 0);
+        return delegate.sendLinkButton(to, body, buttonText, url);
+    }
+
+    @Override
     public String sendTemplate(String to, String templateName, String languageCode, List<String> bodyParams) {
         record(to, "template", templateName, List.of(), 0);
         return delegate.sendTemplate(to, templateName, languageCode, bodyParams);

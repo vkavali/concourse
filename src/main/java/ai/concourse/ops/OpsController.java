@@ -14,6 +14,7 @@ import ai.concourse.journey.JourneyController;
 import ai.concourse.journey.JourneyEntity;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.journey.StageEntity;
+import ai.concourse.travel.TravelLinks;
 import ai.concourse.whatsapp.OutboxChannel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -54,10 +55,12 @@ public class OpsController {
     private final PhoneHasher hasher;
     private final EventRepository events;
     private final OutboxChannel outbox;
+    private final TravelLinks travelLinks;
 
     public OpsController(ConcourseProperties props, JourneyController controller, JourneyService journeys, ConcourseClock clock,
                          ItineraryValidator validator, ContactService contacts, PhoneHasher hasher, EventRepository events,
-                         OutboxChannel outbox) {
+                         OutboxChannel outbox, TravelLinks travelLinks) {
+        this.travelLinks = travelLinks;
         this.props = props;
         this.controller = controller;
         this.journeys = journeys;
@@ -176,6 +179,7 @@ public class OpsController {
         out.put("intro_sent", je.getIntroSentAt() != null);
         out.put("consent_at", je.getConsentAt() == null ? null : je.getConsentAt().toString());
         out.put("current_stage_id", je.getCurrentStageId() == null ? null : je.getCurrentStageId().toString());
+        out.put("travel_url", travelLinks.url(je.getId()));
         out.put("flights", journeys.segments(je.getId()).stream().map(s -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("seq", s.getSeq()); m.put("flight", s.getFlightNumber()); m.put("from", s.getOrigin()); m.put("to", s.getDestination());

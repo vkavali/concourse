@@ -74,6 +74,7 @@
       <button onclick="act('tick')">Run scheduler tick</button>
     </div>
     <div class="status" id="status"></div>
+    <div class="status" id="travel"></div>
     <div class="stages" id="stages"></div>
   </section>
 
@@ -129,6 +130,7 @@
       const j = await call('GET', '/ops/journeys/latest');
       $('clock').textContent = 'clock: ' + (j.clock.travelling ? 'simulated ' + new Date(j.clock.now).toLocaleString() : 'real time');
       $('jstatus').textContent = j.status + (j.consent_at ? '' : ' · not started');
+      $('travel').innerHTML = j.travel_url ? 'Her travel screen: <a href="' + j.travel_url + '" target="_blank" style="color:#7fb0ff">open</a> (same link she gets on WhatsApp)' : '';
       $('stages').innerHTML = j.stages.map(s => `<div class="stage ${s.status}"><span class="seq">${s.seq}</span><span class="type">${s.type}</span><span class="when">${s.scheduled_at ? fmt(s.scheduled_at) : ''}</span></div>`).join('');
       const o = await call('GET', '/ops/outbox?after=' + lastSeq);
       for (const e of o) {

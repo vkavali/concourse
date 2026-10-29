@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="te">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B3D91">
+<title>Concourse</title>
+<style>
+  :root { --navy:#0B3D91; --ink:#111; --mute:#555; --ok:#1b7f45; --warn:#b45f06; --bad:#8f2a2a; --bg:#fff; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font-family: "Noto Sans Telugu", "Gautami", "Nirmala UI", system-ui, sans-serif; }
+  body { display:flex; flex-direction:column; min-height:100vh; }
+  header { background:var(--navy); color:#fff; padding:12px 16px; font-size:18px; font-weight:700; display:flex; align-items:center; gap:10px; }
+  header .status { margin-left:auto; font-size:14px; font-weight:400; opacity:.85; }
+  main { flex:1; overflow:auto; padding:12px 12px 120px; }
+  .big { font-size:26px; line-height:1.4; margin:10px 0; }
+  .card { width:100%; border-radius:12px; display:block; border:1px solid #ddd; }
+  button { font: inherit; }
+  .btn { width:100%; padding:18px 14px; border-radius:14px; border:0; font-size:24px; font-weight:700; color:#fff; background:var(--navy); margin:8px 0; }
+  .btn.alt { background:#e9eef8; color:var(--navy); }
+  .btn.ok { background:var(--ok); } .btn.warn { background:var(--warn); }
+  .row { display:flex; gap:8px; } .row .btn { flex:1; font-size:20px; padding:16px 8px; }
+  #bar { position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid #ddd; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); }
+  #cam { display:none; }
+  #view { position:relative; width:100%; aspect-ratio:3/4; background:#000; border-radius:12px; overflow:hidden; }
+  video { width:100%; height:100%; object-fit:cover; }
+  #banner { position:absolute; left:0; right:0; bottom:0; padding:12px 14px; font-size:22px; line-height:1.35; color:#fff; background:rgba(0,0,0,.55); }
+  #banner.MATCH { background:rgba(27,127,69,.9); } #banner.MISMATCH { background:rgba(180,95,6,.92); } #banner.IRRELEVANT, #banner.UNREADABLE { background:rgba(0,0,0,.6); }
+  #arrow { position:absolute; top:12px; right:12px; width:120px; height:120px; display:none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
+  #want { position:absolute; top:12px; left:12px; padding:8px 12px; background:rgba(255,255,255,.92); color:var(--navy); font-weight:800; font-size:28px; border-radius:10px; letter-spacing:1px; }
+  #scan { position:absolute; top:50%; left:12px; right:12px; height:2px; background:rgba(255,255,255,.35); display:none; }
+  #staff { display:none; position:fixed; inset:0; background:#fff; padding:20px; overflow:auto; z-index:5; }
+  #staff pre { font: 700 22px/1.4 system-ui, sans-serif; white-space:pre-wrap; }
+  .en { font: 600 16px system-ui, sans-serif; color:var(--mute); }
+  #gate { position:fixed; inset:0; background:var(--navy); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; z-index:10; text-align:center; }
+  #gate .btn { background:#fff; color:var(--navy); font-size:30px; }
+  .muted { color:var(--mute); font-size:16px; }
+</style>
+</head>
+<body>
+<div id="gate">
+  <div style="font-size:30px;font-weight:800">కాంకోర్స్</div>
+  <div class="big" id="gateText">మీ ప్రయాణం తెర</div>
+  <button class="btn" onclick="begin()">▶ మొదలు</button>
+  <div class="muted">Concourse travel screen — tap to start</div>
+</div>
+
+<header>కాంకోర్స్ <span class="status" id="hdr"></span></header>
+<main>
+  <section id="stage">
+    <img class="card" id="cardImg" alt="card">
+    <div class="big" id="telugu"></div>
+    <div class="en" id="english"></div>
+    <button class="btn alt" onclick="replay()">🔊 మళ్ళీ వినండి</button>
+    <button class="btn" onclick="toggleCam()" id="camBtn">📷 కెమెరా: బోర్డు చూపించండి</button>
+  </section>
+  <section id="cam">
+    <div id="view">
+      <video id="video" playsinline muted autoplay></video>
+      <div id="want"></div>
+      <svg id="arrow" viewBox="0 0 100 100"><polygon points="50,5 95,55 68,55 68,95 32,95 32,55 5,55" fill="#2ecc71" stroke="#fff" stroke-width="4"/></svg>
+      <div id="scan"></div>
+      <div id="banner">బోర్డు వైపు కెమెరా చూపించండి…</div>
+    </div>
+    <div class="en" id="seen"></div>
+  </section>
+</main>
+<div id="bar">
+  <div class="row">
+    <button class="btn ok" id="doneBtn" onclick="act('done')">✓ అయ్యింది</button>
+    <button class="btn ok" id="hereBtn" onclick="act('here')" style="display:none">✓ నేను వచ్చాను</button>
+    <button class="btn warn" onclick="showStaff()">🪪 STAFF</button>
+    <button class="btn" onclick="act('son')">📞 అబ్బాయి</button>
+  </div>
+</div>
+<div id="staff">
+  <div class="big" style="color:var(--navy)">ఈ తెర సిబ్బందికి చూపించండి</div>
+  <img class="card" id="staffCard" alt="card">
+  <pre id="staffText"></pre>
+  <button class="btn" onclick="hideStaff()">← వెనక్కి</button>
+</div>
+
+<script>
+  const [JID, TOKEN] = (location.hash.replace('#','') || '.').split('.');
+  const api = p => `/travel/api/${JID}/${p}${p.includes('?') ? '&' : '?'}t=${TOKEN}`;
+  const $ = id => document.getElementById(id);
+  let state = null, version = null, player = new Audio(), camOn = false, stream = null, busy = false, lastClip = null, lastClipAt = 0, timer = null;
+
+  async function begin() {
+    $('gate').style.display = 'none';
+    try { player.src = ''; await player.play().catch(() => {}); } catch (e) {}   // unlock audio with this tap
+    await refresh(true);
+    setInterval(() => refresh(false), 8000);
+  }
+
+  async function refresh(force) {
+    let r;
+    try { r = await fetch(api('state')); } catch (e) { $('hdr').textContent = 'offline'; return; }
+    if (!r.ok) { $('gateText').textContent = 'ఈ లింక్ పనిచేయడం లేదు. మీ అబ్బాయిని అడగండి.'; $('gate').style.display = 'flex'; return; }
+    state = await r.json();
+    $('hdr').textContent = state.stage.english ? '' : '';
+    if (state.version !== version || force) {
+      version = state.version;
+      $('telugu').textContent = state.stage.telugu;
+      $('english').textContent = state.stage.english;
+      $('cardImg').src = state.card;
+      $('staffCard').src = state.card;
+      $('staffText').textContent = state.staff_card;
+      $('doneBtn').style.display = state.consented && state.stage.asks_done ? '' : 'none';
+      $('hereBtn').style.display = state.stage.asks_here ? '' : 'none';
+      if (!state.consented) { $('doneBtn').style.display = ''; $('doneBtn').textContent = '✓ నా ప్రయాణం మొదలు'; $('doneBtn').onclick = () => act('start'); }
+      else { $('doneBtn').textContent = '✓ అయ్యింది'; $('doneBtn').onclick = () => act('done'); }
+      $('want').textContent = state.stage.shows_gate_card ? ('GATE ' + (state.stage.gate || '?')) : (state.stage.sign_word || '');
+      if (state.audio) play(state.audio);
+    }
+  }
+
+  function play(url) { try { player.pause(); player.src = url; player.play().catch(() => {}); } catch (e) {} }
+  function replay() { if (state && state.audio) play(state.audio); }
+
+  async function act(what) {
+    try {
+      const r = await fetch(api('action/' + what), {method: 'POST'});
+      const d = await r.json();
+      if (what === 'help' && d.staff_card) { $('staffText').textContent = d.staff_card; showStaff(); }
+      await refresh(true);
+    } catch (e) {}
+  }
+  function showStaff() { $('staff').style.display = 'block'; act('help'); }
+  function hideStaff() { $('staff').style.display = 'none'; }
+
+  async function toggleCam() {
+    if (camOn) { stopCam(); return; }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}, width: {ideal: 1280}}, audio: false});
+    } catch (e) { $('banner').textContent = 'కెమెరా అనుమతి ఇవ్వండి'; $('cam').style.display = 'block'; return; }
+    $('video').srcObject = stream;
+    camOn = true;
+    $('cam').style.display = 'block';
+    $('scan').style.display = 'block';
+    $('camBtn').textContent = '⏹ కెమెరా ఆపండి';
+    timer = setInterval(sendFrame, 2500);
+  }
+  function stopCam() {
+    camOn = false;
+    clearInterval(timer);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    $('cam').style.display = 'none';
+    $('camBtn').textContent = '📷 కెమెరా: బోర్డు చూపించండి';
+  }
+
+  async function sendFrame() {
+    if (!camOn || busy) return;
+    const v = $('video');
+    if (!v.videoWidth) return;
+    const c = document.createElement('canvas');
+    const w = Math.min(960, v.videoWidth), h = Math.round(v.videoHeight * w / v.videoWidth);
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(v, 0, 0, w, h);
+    busy = true;
+    c.toBlob(async blob => {
+      try {
+        const r = await fetch(api('frame'), {method: 'POST', headers: {'Content-Type': 'image/jpeg'}, body: blob});
+        if (r.status === 429) return;
+        const d = await r.json();
+        show(d);
+      } catch (e) {} finally { busy = false; }
+    }, 'image/jpeg', 0.7);
+  }
+
+  function show(d) {
+    const b = $('banner');
+    b.className = d.kind;
+    b.textContent = d.telugu;
+    $('seen').textContent = (d.visible_text || []).join(' · ');
+    const a = $('arrow');
+    if (d.kind === 'MATCH' && d.arrow) {
+      const rot = {left: -90, right: 90, up: 0, straight: 0, down: 180}[d.arrow] || 0;
+      a.style.transform = 'rotate(' + rot + 'deg)';
+      a.style.display = 'block';
+    } else {
+      a.style.display = 'none';
+    }
+    const now = Date.now();
+    if (d.audio && (d.audio !== lastClip || now - lastClipAt > 12000)) { lastClip = d.audio; lastClipAt = now; play(d.audio); }
+  }
+</script>
+</body>
+</html>

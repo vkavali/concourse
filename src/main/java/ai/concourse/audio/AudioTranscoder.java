@@ -51,6 +51,11 @@ public class AudioTranscoder {
                 "-c:a", "libopus", "-b:a", "32k", "-application", "audio", "-map_metadata", "-1", "-f", "ogg"));
     }
 
+    /** Any container → MP3 mono 48 kbps, for the browser (every phone plays MP3; Safari does not play OGG/Opus). */
+    public byte[] toMp3(byte[] input) {
+        return run(input, "in", List.of("-ac", "1", "-ar", "24000", "-c:a", "libmp3lame", "-b:a", "48k", "-map_metadata", "-1", "-f", "mp3"));
+    }
+
     /** Duration of a canonical 16 kHz mono 16-bit WAV (as produced by {@link #toWav16kMono}). */
     public static long wavDurationMs(byte[] wav16kMono) {
         long dataBytes = Math.max(0, wav16kMono.length - 44);

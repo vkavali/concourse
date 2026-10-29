@@ -17,6 +17,9 @@ public interface MessagingChannel {
 
     String sendImage(String to, byte[] png, String caption);
 
+    /** One tappable link button (WhatsApp "cta_url"): opens {@code url} in the phone's browser. */
+    String sendLinkButton(String to, String body, String buttonText, String url);
+
     /** An approved template (the only thing WhatsApp lets through outside the 24-hour window). */
     String sendTemplate(String to, String templateName, String languageCode, List<String> bodyParams);
 

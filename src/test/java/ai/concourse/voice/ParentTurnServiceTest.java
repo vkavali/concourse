@@ -21,6 +21,7 @@ import ai.concourse.spark.PromptLoader;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
 import ai.concourse.stt.SttClient;
+import ai.concourse.travel.TravelLinks;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.whatsapp.MessagingChannel;
 import ai.concourse.whatsapp.WhatsAppClient;
@@ -61,7 +62,7 @@ class ParentTurnServiceTest {
 
     @BeforeEach
     void setUp() {
-        messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, new SignCardRenderer(), contacts, journeys, new Airports());
+        messenger = new ParentMessenger(channel, tts, new SafetyPolicy(), cards, new SignCardRenderer(), contacts, journeys, new Airports(), new TravelLinks("salt", "http://x"));
         service = new ParentTurnService(channel, transcoder, stt, spark, new PromptLoader(mapper), journeys, controller,
                 messenger, hasher, eventLog, mapper);
         when(cards.gateCard(any())).thenReturn(new byte[]{0x50, 0x4E, 0x47});

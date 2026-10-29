@@ -68,6 +68,18 @@ public class WhatsAppClient implements MessagingChannel {
                 "interactive", Map.of("type", "button", "body", Map.of("text", body), "action", Map.of("buttons", btns))));
     }
 
+    /** A link button; falls back to plain text with the URL if the account cannot send interactive cta_url messages. */
+    @Override
+    public String sendLinkButton(String to, String body, String buttonText, String url) {
+        try {
+            return send(Map.of("messaging_product", "whatsapp", "to", to, "type", "interactive",
+                    "interactive", Map.of("type", "cta_url", "body", Map.of("text", body),
+                            "action", Map.of("name", "cta_url", "parameters", Map.of("display_text", buttonText, "url", url)))));
+        } catch (RuntimeException e) {
+            return sendText(to, body + "\n" + url);
+        }
+    }
+
     /** Uploads media and returns the media id. mimeType e.g. "audio/ogg; codecs=opus", "image/png". */
     public String uploadMedia(byte[] bytes, String mimeType, String filename) {
         MultipartBodyBuilder mb = new MultipartBodyBuilder();

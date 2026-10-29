@@ -56,7 +56,15 @@ public class SignEvidenceService {
         this.eventLog = eventLog;
     }
 
-    /** Parent sent a photo. */
+    /** What one frame means for this journey right now. Shared by the WhatsApp photo path and Travel Mode's camera. */
+    public record Assessment(StageType stage, Integer segmentSeq, SignObservation seen, EvidenceReconciler.Verdict verdict,
+                             JourneyFacts facts, JourneyFacts factsWithArrow, long sparkMs) {
+        public String safeTelugu(ai.concourse.safety.SafetyPolicy safety) {
+            return safety.check(verdict.telugu(), factsWithArrow).text();
+        }
+    }
+
+    /** Parent sent a photo over WhatsApp. */
     public void handlePhoto(String parentWaId, String mediaId, String mimeType) {
         long t0 = System.currentTimeMillis();
         Optional<JourneyEntity> journey = journeys.latestForParent(hasher.hash(parentWaId));
@@ -66,9 +74,28 @@ public class SignEvidenceService {
         }
         JourneyEntity j = journey.get();
         controller.onParentMessage(j);
-        JourneyFacts facts = messenger.facts(j);
-
         byte[] image = channel.downloadMedia(mediaId);
+        long t1 = System.currentTimeMillis();
+        Assessment a = assess(j, image, mimeType, "whatsapp");
+        if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) {
+            if (a.stage().showsGateCard()) messenger.sendGateCard(parentWaId, a.facts(), a.segmentSeq());
+            else messenger.sendSignCard(parentWaId, a.stage(), a.facts(), a.segmentSeq());
+        }
+        messenger.speak(parentWaId, a.verdict().telugu(), null, a.factsWithArrow());
+        long t3 = System.currentTimeMillis();
+        log.info("sign turn {} ms (dl {} / spark {} / reply {}) verdict={} {}", t3 - t0, t1 - t0, a.sparkMs(), t3 - t1 - a.sparkMs(),
+                a.verdict().kind(), a.verdict().english());
+        if (a.verdict().kind() == EvidenceReconciler.Kind.MISMATCH) {
+            messenger.tellChild(j, "She photographed a sign that does not show her gate (" + a.verdict().english() + "). I told her the verified gate and to ask staff if unsure.");
+        }
+    }
+
+    /**
+     * Reads the image, drops any location claim, compares with the current stage's target. The image bytes are
+     * zeroed before returning. {@code source} is logged ("whatsapp" or "camera").
+     */
+    public Assessment assess(JourneyEntity j, byte[] image, String mimeType, String source) {
+        JourneyFacts facts = messenger.facts(j);
         long t1 = System.currentTimeMillis();
         SignObservation seen;
         try {
@@ -76,31 +103,24 @@ public class SignEvidenceService {
         } finally {
             java.util.Arrays.fill(image, (byte) 0); // the photo is never kept
         }
-        long t2 = System.currentTimeMillis();
-
+        long sparkMs = System.currentTimeMillis() - t1;
         if (seen.locationClaim() != null) {
             eventLog.record(j.getId(), EventLog.ACTOR_SYSTEM, "location_claim_dropped", Map.of("claim", String.valueOf(seen.locationClaim())));
             seen = new SignObservation(seen.isAirportSign(), seen.visibleText(), seen.gateCodes(), seen.explicitArrow(), seen.confidence(), null);
         }
-
         Optional<StageEntity> current = controller.current(j);
         StageType stage = current.map(StageEntity::stageType).filter(t -> t != StageType.PRE_TRIP).orElse(StageType.WAITING_AT_ORIGIN);
         Integer segmentSeq = current.map(StageEntity::getSegmentSeq).orElse(1);
-        JourneyFacts.Flight flight = facts.flights().stream().filter(f -> f.seq() == (segmentSeq == null ? 1 : segmentSeq)).findFirst().orElse(facts.firstFlight());
+        int seq = segmentSeq == null ? 1 : segmentSeq;
+        JourneyFacts.Flight flight = facts.flights().stream().filter(f -> f.seq() == seq).findFirst().orElse(facts.firstFlight());
         EvidenceReconciler.Target target = EvidenceReconciler.targetFor(stage, flight);
         EvidenceReconciler.Verdict verdict = EvidenceReconciler.reconcile(seen, target);
-
         // The arrow she photographed is the only thing that ever licenses a direction word.
         JourneyFacts withArrow = new JourneyFacts(facts.status(), facts.travelerFirstName(), facts.flights(), facts.nextVerifiedStep(),
                 facts.lastAcknowledgedStage(), verdict.kind() == EvidenceReconciler.Kind.MATCH ? verdict.arrow() : null);
-        if (verdict.kind() != EvidenceReconciler.Kind.MATCH) {
-            if (stage.showsGateCard()) messenger.sendGateCard(parentWaId, facts, segmentSeq);
-            else messenger.sendSignCard(parentWaId, stage, facts, segmentSeq);
-        }
-        String sent = messenger.speak(parentWaId, verdict.telugu(), null, withArrow);
-        long t3 = System.currentTimeMillis();
 
         Map<String, Object> event = new LinkedHashMap<>();
+        event.put("source", source);
         event.put("stage", stage.name());
         event.put("verdict", verdict.kind().name());
         event.put("matched", verdict.matched());
@@ -108,13 +128,9 @@ public class SignEvidenceService {
         event.put("confidence", seen.confidence());
         event.put("visible_text", seen.visibleText().size() > 12 ? seen.visibleText().subList(0, 12) : seen.visibleText());
         event.put("gate_codes", seen.gateCodes());
-        event.put("fallback", !sent.equals(verdict.telugu()));
-        event.put("ms", Map.of("download", t1 - t0, "spark", t2 - t1, "reply", t3 - t2, "total", t3 - t0));
+        event.put("spark_ms", sparkMs);
         eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "sign_observed", event);
-        log.info("sign turn {} ms (dl {} / spark {} / reply {}) verdict={} {}", t3 - t0, t1 - t0, t2 - t1, t3 - t2, verdict.kind(), verdict.english());
-        if (verdict.kind() == EvidenceReconciler.Kind.MISMATCH) {
-            messenger.tellChild(j, "She photographed a sign that does not show her gate (" + verdict.english() + "). I told her the verified gate and to ask staff if unsure.");
-        }
+        return new Assessment(stage, segmentSeq, seen, verdict, facts, withArrow, sparkMs);
     }
 
     SignObservation observe(byte[] image, String mimeType) {

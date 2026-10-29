@@ -97,6 +97,7 @@ public class JourneyController {
             sb.append("\n⚠ Every stage of this itinerary is already in the past, so they cannot fire in order — use a future-dated ticket (the sample itinerary in the repo) or the simulator.");
         }
         messenger.tellChild(j, sb.toString());
+        messenger.sendTravelLink(j);
         prewarm(j, facts);
     }
 
@@ -185,7 +186,8 @@ public class JourneyController {
         journeys.save(j);
         eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "consent", Map.of("how", how));
         messenger.speak(parentNumber(j), StageText.CONSENT_THANKS, null, messenger.facts(j));
-        messenger.tellChild(j, "She said 'start my trip' (" + how + "). Consent recorded; stage pushes are armed.");
+        if (!"travel mode".equals(how)) messenger.sendTravelLink(j);
+        messenger.tellChild(j, "She said 'start my trip' (" + how + "). Consent recorded; stage pushes are armed. Her travel screen: " + messenger.travelUrl(j));
         advanceDue(j);
     }
 

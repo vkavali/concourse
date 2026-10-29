@@ -18,6 +18,8 @@ import java.util.UUID;
 public class JourneyService {
     private static final Logger log = LoggerFactory.getLogger(JourneyService.class);
     private static final int EXPIRE_DAYS_AFTER_ARRIVAL = 7;
+    public static final String ABANDONED = "ABANDONED";
+    public static final List<String> CLOSED = List.of("COMPLETE", ABANDONED);
 
     private final JourneyRepository journeys;
     private final FlightSegmentRepository segments;
@@ -87,7 +89,7 @@ public class JourneyService {
 
     @Transactional(readOnly = true)
     public Optional<JourneyEntity> latestForParent(String parentPhoneHash) {
-        return journeys.findFirstByParentPhoneHashAndStatusNotOrderByCreatedAtDesc(parentPhoneHash, "COMPLETE");
+        return journeys.findFirstByParentPhoneHashAndStatusNotInOrderByCreatedAtDesc(parentPhoneHash, CLOSED);
     }
 
     /** Links the traveler's number to the child's latest journey. Returns empty if the child has no journey yet. */
@@ -120,6 +122,19 @@ public class JourneyService {
                     Map.of("seq", seq, "from", old == null ? "" : old, "to", x.getGate() == null ? "" : x.getGate(), "source", source));
         });
         return seg;
+    }
+
+    /** Every other open journey of this traveler is closed so only one journey ever speaks to her. */
+    @Transactional
+    public List<JourneyEntity> abandonOthers(String parentPhoneHash, UUID keep) {
+        List<JourneyEntity> others = journeys.findByParentPhoneHashAndStatusNotIn(parentPhoneHash, CLOSED).stream()
+                .filter(x -> !x.getId().equals(keep)).toList();
+        for (JourneyEntity x : others) {
+            x.setStatus(ABANDONED);
+            journeys.save(x);
+            eventLog.record(x.getId(), EventLog.ACTOR_SYSTEM, "journey_abandoned", Map.of("replaced_by", keep.toString()));
+        }
+        return others;
     }
 
     @Transactional

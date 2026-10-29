@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * The one place that talks to the two phones: every Telugu message to the parent passes {@link SafetyPolicy} and goes
@@ -35,6 +37,11 @@ public class ParentMessenger {
     private final ContactService contacts;
     private final JourneyService journeys;
     private final Airports airports;
+    private final ExecutorService warmer = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "tts-prewarm");
+        t.setDaemon(true);
+        return t;
+    });
 
     public ParentMessenger(MessagingChannel channel, TtsClient tts, SafetyPolicy safety, CardRenderer cards,
                            ContactService contacts, JourneyService journeys, Airports airports) {
@@ -62,6 +69,25 @@ public class ParentMessenger {
         if (buttons != null && !buttons.isEmpty()) channel.sendButtons(to, text, buttons);
         else channel.sendText(to, text);
         return text;
+    }
+
+    /**
+     * Synthesises these texts in the background so the voice note is already cached when its stage fires — the
+     * difference between a push that lands in a second and one that lands in ten.
+     */
+    public void prewarm(List<String> texts, JourneyFacts facts) {
+        if (!tts.isConfigured() || texts.isEmpty()) return;
+        Map<String, String> names = Airlines.spokenNames(facts == null ? null : facts.flights());
+        warmer.submit(() -> {
+            for (String t : texts) {
+                try {
+                    tts.synthesizeOggOpus(TeluguSpeech.spokenForm(safety.check(t, facts).text(), names));
+                } catch (Exception e) {
+                    log.debug("prewarm skipped: {}", e.getMessage());
+                }
+            }
+            log.info("tts prewarm done: {} texts", texts.size());
+        });
     }
 
     /** Whether the last reply had to be replaced by the safe fallback. */

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concourse Simulator</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --ink:#e8eaf0; --mute:#9aa3b2; --parent:#1f6f4a; --child:#2a4d8f; --amber:#b45f06; --red:#8f2a2a; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:2; }
+  header h1 { font-size:16px; margin:0; letter-spacing:.3px; }
+  .tag { font-size:11px; padding:2px 8px; border-radius:999px; background:var(--amber); color:#fff; font-weight:600; letter-spacing:.5px; }
+  .clock { margin-left:auto; color:var(--mute); font-variant-numeric:tabular-nums; }
+  main { display:grid; grid-template-columns: 300px 1fr 1fr; gap:12px; padding:12px 16px; min-height:calc(100vh - 52px); }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; display:flex; flex-direction:column; min-height:0; }
+  .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--mute); margin:0 0 10px; }
+  label { display:block; font-size:12px; color:var(--mute); margin:8px 0 4px; }
+  input { width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--line); background:#0f1115; color:var(--ink); font:inherit; }
+  button { width:100%; margin-top:8px; padding:9px 10px; border-radius:8px; border:1px solid var(--line); background:#232835; color:var(--ink); font:inherit; cursor:pointer; text-align:left; }
+  button:hover { background:#2c3344; }
+  button.primary { background:var(--parent); border-color:transparent; }
+  button.danger { background:var(--amber); border-color:transparent; }
+  button:disabled { opacity:.45; cursor:default; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  .stages { margin-top:10px; font-size:12px; }
+  .stage { display:flex; gap:8px; padding:4px 0; border-top:1px solid var(--line); color:var(--mute); }
+  .stage.SENT { color:var(--ink); } .stage.ACKED { color:#7fd3a3; } .stage.SKIPPED { text-decoration:line-through; } .stage.HELD { color:#f0b35a; }
+  .stage .seq { width:18px; text-align:right; } .stage .type { flex:1; } .stage .when { font-variant-numeric:tabular-nums; }
+  .phone { display:flex; flex-direction:column; }
+  .phone .feed { flex:1; overflow:auto; display:flex; flex-direction:column; gap:8px; padding:4px 2px; }
+  .msg { max-width:88%; padding:8px 11px; border-radius:12px; background:#232835; white-space:pre-wrap; word-break:break-word; }
+  .msg.parent { background:#20342a; } .msg.child { background:#1f2a40; }
+  .msg .meta { font-size:11px; color:var(--mute); margin-bottom:3px; }
+  .msg .btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .msg .btns span { font-size:12px; padding:3px 8px; border:1px solid var(--line); border-radius:999px; }
+  .voice { font-weight:600; } .img { font-style:italic; color:var(--mute); }
+  .status { font-size:12px; color:var(--mute); margin-top:8px; min-height:18px; }
+  .err { color:#ff8a8a; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Concourse</h1>
+  <span class="tag">SIMULATOR</span>
+  <span style="color:var(--mute)">simulated operations events · real WhatsApp messages go to the registered phones</span>
+  <span class="clock" id="clock">clock: —</span>
+</header>
+<main>
+  <section class="panel">
+    <h2>Controls</h2>
+    <label>Admin token (ADMIN_TOKEN in .env)</label>
+    <input id="token" placeholder="paste ADMIN_TOKEN">
+    <label>Child's WhatsApp number (digits, with country code)</label>
+    <input id="child" placeholder="17165550100">
+    <label>Traveler's number (blank = same phone plays both)</label>
+    <input id="parent" placeholder="919876543210">
+    <button class="primary" onclick="demo()">1 · New demo journey (sample HYD→DOH→DFW, dated +2 days) → intro to her</button>
+    <button onclick="act('consent')">2 · She says "start my trip"</button>
+    <button onclick="act('next')">3 · Fire next stage now (clock jumps to it)</button>
+    <div class="row">
+      <button onclick="act('ack')">She taps "done ✓"</button>
+      <button onclick="act('here')">She taps "I'm here"</button>
+    </div>
+    <label>Gate change (the demo's operations event)</label>
+    <div class="row">
+      <input id="seg" value="2" title="flight number in the itinerary (1 or 2)">
+      <input id="gate" value="C7" placeholder="new gate">
+    </div>
+    <button class="danger" onclick="gateChange()">Apply simulated operations event: gate change</button>
+    <div class="row">
+      <button onclick="setClock({reset:true})">Clock → real time</button>
+      <button onclick="act('tick')">Run scheduler tick</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="stages" id="stages"></div>
+  </section>
+
+  <section class="panel phone">
+    <h2>Traveler's phone (Telugu) <span id="jstatus" style="float:right;color:var(--ink)"></span></h2>
+    <div class="feed" id="parentFeed"></div>
+  </section>
+
+  <section class="panel phone">
+    <h2>Child's phone (English)</h2>
+    <div class="feed" id="childFeed"></div>
+  </section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  let lastSeq = 0;
+  for (const k of ['token','child','parent']) { try { $(k).value = localStorage.getItem('sim.'+k) || ''; } catch (e) {} $(k).addEventListener('change', () => { try { localStorage.setItem('sim.'+k, $(k).value.trim()); } catch (e) {} }); }
+
+  function headers() { return {'Content-Type':'application/json', 'X-Admin-Token': $('token').value.trim()}; }
+  async function call(method, path, body) {
+    const r = await fetch(path, {method, headers: headers(), body: body ? JSON.stringify(body) : undefined});
+    let data = null; try { data = await r.json(); } catch (e) {}
+    if (!r.ok) throw new Error((data && data.error) || (r.status + ' ' + r.statusText));
+    return data;
+  }
+  function say(text, isErr) { $('status').textContent = text; $('status').className = 'status' + (isErr ? ' err' : ''); }
+
+  async function demo() {
+    try {
+      const d = await call('POST', '/ops/demo', {child: $('child').value.trim(), parent: $('parent').value.trim(), days_ahead: 2});
+      say('Demo journey ' + d.journey_id.slice(0,8) + ' for ' + d.date + (d.parent_is_child ? ' (one phone plays both)' : '') + ' — intro sent.');
+      lastSeq = 0; $('parentFeed').innerHTML = ''; $('childFeed').innerHTML = '';
+      refresh();
+    } catch (e) { say(e.message, true); }
+  }
+  async function act(action) {
+    try { const d = await call('POST', '/ops/journeys/latest/' + action); say(action + ' → ' + JSON.stringify(d)); refresh(); }
+    catch (e) { say(e.message, true); }
+  }
+  async function gateChange() {
+    try {
+      const d = await call('POST', '/ops/events', {type:'GATE_CHANGE', segment: parseInt($('seg').value||'1',10), new_gate: $('gate').value.trim(), source:'demo operations event'});
+      say('gate change applied (' + d.source + ')'); refresh();
+    } catch (e) { say(e.message, true); }
+  }
+  async function setClock(body) { try { const d = await call('POST', '/ops/clock', body); say('clock: ' + d.now); refresh(); } catch (e) { say(e.message, true); } }
+
+  function fmt(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
+
+  async function refresh() {
+    if (!$('token').value.trim()) return;
+    try {
+      const j = await call('GET', '/ops/journeys/latest');
+      $('clock').textContent = 'clock: ' + (j.clock.travelling ? 'simulated ' + new Date(j.clock.now).toLocaleString() : 'real time');
+      $('jstatus').textContent = j.status + (j.consent_at ? '' : ' · not started');
+      $('stages').innerHTML = j.stages.map(s => `<div class="stage ${s.status}"><span class="seq">${s.seq}</span><span class="type">${s.type}</span><span class="when">${s.scheduled_at ? fmt(s.scheduled_at) : ''}</span></div>`).join('');
+      const o = await call('GET', '/ops/outbox?after=' + lastSeq);
+      for (const e of o) {
+        lastSeq = Math.max(lastSeq, e.seq);
+        const feed = e.role === 'parent' ? $('parentFeed') : $('childFeed');
+        const div = document.createElement('div');
+        div.className = 'msg ' + (e.role === 'parent' ? 'parent' : 'child');
+        let body = '';
+        if (e.kind === 'voice') body = '<span class="voice">🔊 voice note</span> <span class="img">(' + Math.round(e.bytes/1024) + ' KB)</span>';
+        else if (e.kind === 'image') body = '<span class="img">🖼 card · ' + esc(e.text) + '</span>';
+        else if (e.kind === 'template') body = '<span class="img">📨 template ' + esc(e.text) + '</span>';
+        else body = esc(e.text);
+        if (e.buttons && e.buttons.length) body += '<div class="btns">' + e.buttons.map(b => '<span>' + esc(b) + '</span>').join('') + '</div>';
+        div.innerHTML = '<div class="meta">' + new Date(e.at).toLocaleTimeString() + ' · ' + e.kind + '</div>' + body;
+        feed.appendChild(div);
+        feed.scrollTop = feed.scrollHeight;
+      }
+    } catch (e) { if (!/no journey/.test(e.message)) say(e.message, true); }
+  }
+  function esc(s) { return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  setInterval(refresh, 2000);
+  refresh();
+</script>
+</body>
+</html>

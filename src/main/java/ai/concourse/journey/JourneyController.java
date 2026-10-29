@@ -91,7 +91,36 @@ public class JourneyController {
                 .ifPresent(s -> sb.append(", first (").append(s.type()).append(") at ").append(local(s.scheduledAt(), s.airport())));
         sb.append(". Type 'plan' to see them.");
         for (String w : plan.warnings()) sb.append("\n⚠ ").append(w);
+        OffsetDateTime lastTimed = plan.stages().stream().map(StagePlanner.PlannedStage::scheduledAt).filter(t -> t != null)
+                .max(OffsetDateTime::compareTo).orElse(null);
+        if (lastTimed != null && lastTimed.isBefore(clock.now())) {
+            sb.append("\n⚠ Every stage of this itinerary is already in the past, so they cannot fire in order — use a future-dated ticket (the sample itinerary in the repo) or the simulator.");
+        }
         messenger.tellChild(j, sb.toString());
+        prewarm(j, facts);
+    }
+
+    /** Warms the voice cache for everything this journey may say, so stage pushes land fast. */
+    private void prewarm(JourneyEntity j, JourneyFacts facts) {
+        List<String> texts = new ArrayList<>();
+        texts.add(StageText.CONSENT_THANKS);
+        texts.add(StageText.ACK_THANKS);
+        texts.add(TeluguPhrases.gateAnswer(facts));
+        for (StageEntity s : stages.findByJourneyIdOrderBySeq(j.getId())) {
+            if (s.stageType() == StageType.PRE_TRIP) continue;
+            texts.add(StageText.instruction(s.stageType(), facts, s.getSegmentSeq(), s.getAirport()));
+        }
+        messenger.prewarm(texts, facts);
+    }
+
+    /** Closes every pending job of a journey (it was abandoned or completed). */
+    @Transactional
+    public void cancelPendingJobs(UUID journeyId, String why) {
+        for (OutboundJobEntity job : jobs.findByJourneyIdAndStatus(journeyId, OutboundJobEntity.PENDING)) {
+            job.setStatus(OutboundJobEntity.CANCELLED);
+            job.setLastError(why);
+            jobs.save(job);
+        }
     }
 
     /** (Re)builds the PLANNED stages and their jobs from the current verified segments; sent/acked rows stay. */
@@ -205,7 +234,7 @@ public class JourneyController {
                 .toList();
         if (due.isEmpty()) return Optional.empty();
         if (j.getConsentAt() == null) {
-            for (StageEntity s : due) holdForConsent(j, s);
+            holdForConsent(j, due);
             return Optional.empty();
         }
         StageEntity target = due.get(due.size() - 1);
@@ -230,15 +259,24 @@ public class JourneyController {
         return Optional.of(target);
     }
 
-    private void holdForConsent(JourneyEntity j, StageEntity s) {
-        for (OutboundJobEntity job : jobs.findByJourneyIdOrderByRunAt(j.getId())) {
-            if (s.getId().equals(job.getStageId()) && OutboundJobEntity.PENDING.equals(job.getStatus()) && job.getLastError() == null) {
-                job.setLastError("waiting for consent");
-                jobs.save(job);
-                messenger.tellChild(j, "Stage " + s.getType() + " is due but she has not said 'start my trip' yet. Ask her to send any voice note saying it, or to tap the button.");
-                eventLog.record(j.getId(), EventLog.ACTOR_SYSTEM, "stage_waiting_consent", Map.of("stage", s.getType()));
+    /** Due but no consent: the jobs are flagged and the child is told once per tick — one line, not one per stage. */
+    private void holdForConsent(JourneyEntity j, List<StageEntity> due) {
+        List<OutboundJobEntity> all = jobs.findByJourneyIdOrderByRunAt(j.getId());
+        int newlyHeld = 0;
+        for (StageEntity s : due) {
+            for (OutboundJobEntity job : all) {
+                if (s.getId().equals(job.getStageId()) && OutboundJobEntity.PENDING.equals(job.getStatus()) && job.getLastError() == null) {
+                    job.setLastError("waiting for consent");
+                    jobs.save(job);
+                    newlyHeld++;
+                }
             }
         }
+        if (newlyHeld == 0) return;
+        StageEntity latest = due.get(due.size() - 1);
+        messenger.tellChild(j, (due.size() == 1 ? "Stage " + latest.getType() + " is due" : due.size() + " stages are due (latest " + latest.getType() + ")")
+                + " but she has not said 'start my trip' yet. Only the latest goes out when she does. Ask her to send a voice note saying it, or to tap the button.");
+        eventLog.record(j.getId(), EventLog.ACTOR_SYSTEM, "stages_waiting_consent", Map.of("due", due.size(), "latest", latest.getType()));
     }
 
     private void pushStage(JourneyEntity j, StageEntity stage) {
@@ -386,7 +424,10 @@ public class JourneyController {
     public boolean applyGateChange(JourneyEntity j, int segmentSeq, String newGate, String source) {
         if (journeys.applyVerifiedFlightUpdate(j.getId(), segmentSeq, newGate, source).isEmpty()) return false;
         JourneyEntity fresh = journeys.find(j.getId()).orElse(j);
-        if (fresh.getIntroSentAt() != null) planStages(fresh);
+        if (fresh.getIntroSentAt() != null) {
+            planStages(fresh);
+            prewarm(fresh, messenger.facts(fresh));
+        }
         announceGateChange(fresh, segmentSeq, source);
         return true;
     }

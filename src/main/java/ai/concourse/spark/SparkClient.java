@@ -55,6 +55,8 @@ public class SparkClient {
     private final boolean stream;
     private final Duration timeout;
     private final boolean configured;
+    private Integer maxTokens;          // optional body default (open-weight deployments count reasoning tokens here)
+    private String reasoningEffort;     // optional body default
     private ModelCallLog callLog;   // optional
     private ModelTape tape;         // optional
 
@@ -83,6 +85,13 @@ public class SparkClient {
 
     public boolean isConfigured() { return configured; }
 
+    /** Body defaults sent with every request: {@code max_tokens} and {@code reasoning_effort} (null = omitted). */
+    public SparkClient withBodyDefaults(Integer maxTokens, String reasoningEffort) {
+        this.maxTokens = maxTokens;
+        this.reasoningEffort = reasoningEffort == null || reasoningEffort.isBlank() ? null : reasoningEffort;
+        return this;
+    }
+
     @Autowired(required = false)
     public void setCallLog(ModelCallLog callLog) { this.callLog = callLog; }
 
@@ -96,10 +105,10 @@ public class SparkClient {
     public SparkResponse complete(SparkRequest req) {
         String key = tape != null && tape.mode() != ModelTape.Mode.OFF ? tapeKey(req) : null;
         if (tape != null && tape.replaying()) {
-            Optional<String> hit = tape.lookup("spark", key);
+            Optional<ModelTape.Recording> hit = tape.recording("spark", key);
             if (hit.isPresent()) {
-                note(req.op(), 0, true, "replayed from tape");
-                return new SparkResponse(hit.get(), 0, 0, model + " (recording)");
+                note(req.op(), 0, true, "replayed from tape (" + hit.get().model() + ")");
+                return new SparkResponse(hit.get().output(), 0, 0, hit.get().model() + " (recording)");
             }
             if (!configured) {
                 note(req.op(), 0, false, "not on tape and no MODEL_API_KEY");
@@ -132,9 +141,12 @@ public class SparkClient {
         if (callLog != null) callLog.record(model, op, ms, ok, note);
     }
 
-    /** The recording key: the caller's input hash when given, else the whole request. Never leaves the machine. */
+    /**
+     * The recording key: the caller's input hash when given (per operation, not per model — so an answer recorded from
+     * Spark Open replays even when the judge runs Spark 1.3 only), else the whole request. Never leaves the machine.
+     */
     String tapeKey(SparkRequest req) {
-        if (req.tapeKey() != null && !req.tapeKey().isBlank()) return ModelTape.sha256(model + "|" + req.op() + "|" + req.tapeKey());
+        if (req.tapeKey() != null && !req.tapeKey().isBlank()) return ModelTape.sha256(req.op() + "|" + req.tapeKey());
         ObjectNode body = buildBody(req, false);
         body.remove("stream");
         body.remove("stream_options");
@@ -197,6 +209,8 @@ public class SparkClient {
         ObjectNode body = mapper.createObjectNode();
         body.put("model", model);
         if (req.temperature() != null) body.put("temperature", req.temperature());
+        if (maxTokens != null) body.put("max_tokens", maxTokens);
+        if (reasoningEffort != null) body.put("reasoning_effort", reasoningEffort);
         body.put("stream", streaming);
         if (streaming) body.putObject("stream_options").put("include_usage", true);
 

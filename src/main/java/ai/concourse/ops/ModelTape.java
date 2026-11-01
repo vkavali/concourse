@@ -66,13 +66,22 @@ public class ModelTape {
     public Path ttsDir() { return dir.resolve("tts"); }
     public Path inputsDir() { return dir.resolve("inputs"); }
 
+    /** One recording: the model's output and which model produced it. */
+    public record Recording(String output, String model) {}
+
     /** A recorded model output for this kind and key, if the tape has one. */
     public Optional<String> lookup(String kind, String key) {
+        return recording(kind, key).map(Recording::output);
+    }
+
+    public Optional<Recording> recording(String kind, String key) {
+        if (key == null) return Optional.empty();
         Path p = dir.resolve(kind).resolve(key + ".json");
         if (!Files.isRegularFile(p)) return Optional.empty();
         try {
             JsonNode n = mapper.readTree(Files.readString(p, StandardCharsets.UTF_8));
-            return n.hasNonNull("output") ? Optional.of(n.get("output").asText()) : Optional.empty();
+            if (!n.hasNonNull("output")) return Optional.empty();
+            return Optional.of(new Recording(n.get("output").asText(), n.path("model").asText("recording")));
         } catch (IOException e) {
             log.warn("tape entry unreadable {}: {}", p, e.getMessage());
             return Optional.empty();

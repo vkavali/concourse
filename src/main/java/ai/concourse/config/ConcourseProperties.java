@@ -25,7 +25,10 @@ public record ConcourseProperties(
             @DefaultValue("https://graph.facebook.com/v25.0") String graphBaseUrl
     ) {}
 
-    /** Meta Model API: Muse Spark (chat completions) and Muse Voice Transcribe (/asr/transcribe). */
+    /**
+     * Meta Model API: Muse Spark (chat completions) and Muse Voice Transcribe (/asr/transcribe) — plus, optionally,
+     * Meta's open-weight Muse Spark Open through partner inference (Baseten) for the small intent call.
+     */
     public record Meta(
             String apiKey,
             @DefaultValue("https://api.meta.ai/v1") String baseUrl,
@@ -33,7 +36,15 @@ public record ConcourseProperties(
             @DefaultValue("muse-voice-transcribe-1.0") String sttModel,
             /** Stream chat completions (SSE) and aggregate; avoids gateway timeouts on long generations. */
             @DefaultValue("true") boolean stream,
-            @DefaultValue("120") int timeoutSeconds
+            @DefaultValue("120") int timeoutSeconds,
+            /** OpenAI-compatible base URL of the open-weight deployment (e.g. https://inference.baseten.co/v1); empty = off. */
+            String openBaseUrl,
+            String openApiKey,
+            @DefaultValue("meta-models/muse-spark-open-1026") String openModel,
+            /** Reasoning tokens count against max_tokens on Spark Open: keep room for the JSON answer. */
+            @DefaultValue("1024") int openMaxTokens,
+            /** "low" keeps the open model's thinking short for a classification; empty = omit the field. */
+            @DefaultValue("low") String openReasoningEffort
     ) {}
 
     /**

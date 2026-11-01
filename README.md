@@ -60,7 +60,7 @@ the model id next to every call.
 | Reach a parent who only uses WhatsApp | **WhatsApp Business Cloud API** | webhooks in, voice notes (`voice: true`), images, 3-button replies, link buttons (`cta_url`), templates outside the 24-h window | Meta Graph API v25.0 |
 | Read the ticket (PDF or a crumpled boarding-pass photo) | **Muse Spark 1.3** (`muse-spark-1.3`, standard tier) | `/v1/chat/completions`, inline PDF/image, constrained JSON (`response_format: json_schema`) | Meta Model API |
 | Understand her Telugu voice note | **Muse Voice Transcribe 1.0** (`muse-voice-transcribe-1.0`) | `/v1/asr/transcribe`, WAV 16 kHz mono, `languageBias: ["Telugu","English"]`, airport `keywords` | Meta Model API |
-| Classify what she means (gate? help? son? start my trip?) | **Muse Spark 1.3** | intent + confidence + tool proposal; code decides and answers from verified facts | Meta Model API |
+| Classify what she means (gate? help? son? start my trip?) | **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights) first when `SPARK_OPEN_BASE_URL` is set, **Muse Spark 1.3** otherwise and whenever the open model fails | intent + confidence + tool proposal; code decides and answers from verified facts | Baseten partner inference / Meta Model API |
 | Read the board she photographs, or points the camera at | **Muse Spark 1.3** (vision) | `visible_text`, `gate_codes`, one `explicit_arrow`; `location_claim` is typed null | Meta Model API |
 | Speak Telugu | **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, CC-BY-NC 4.0) or **MMS-TTS Telugu** (`facebook/mms-tts-tel`, CC-BY-NC 4.0) — Meta open weights | text → speech phrase by phrase, pauses engineered in code, Opus voice notes | our Modal deployment (`modal/`) |
 

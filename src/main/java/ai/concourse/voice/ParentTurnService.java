@@ -79,9 +79,13 @@ public class ParentTurnService {
     public record Reply(String outcome, String telugu, String intent) {}
 
     private ModelTape tape; // optional: record/replay of her inputs
+    private ai.concourse.spark.SparkOpen sparkOpen; // optional: open-weight classifier first, Spark 1.3 as the fallback
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setTape(ModelTape tape) { this.tape = tape; }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSparkOpen(ai.concourse.spark.SparkOpen sparkOpen) { this.sparkOpen = sparkOpen; }
 
     /** Parent sent a voice note over WhatsApp. */
     public void handleVoiceNote(String parentWaId, String mediaId) {
@@ -241,6 +245,15 @@ public class ParentTurnService {
         SparkRequest req = new SparkRequest(prompts.prompt("parent_turn"), user, List.of(),
                 new SparkRequest.JsonSchema("parent_turn", prompts.schema("parent_turn")), 0.2,
                 ModelTape.sha256(transcript)); // the recording is tied to what she said, not to the journey's dates
+        if (sparkOpen != null && sparkOpen.enabled()) {
+            try {
+                ParentTurn open = sparkOpen.client().orElseThrow().completeJson(req, ParentTurn.class, mapper);
+                if (open != null && open.intent() != null && !open.intent().isBlank()) return open;
+                log.warn("spark open returned no intent; falling back to {}", spark.model());
+            } catch (RuntimeException e) {
+                log.warn("spark open failed ({}); falling back to {}", e.getMessage(), spark.model());
+            }
+        }
         return spark.completeJson(req, ParentTurn.class, mapper);
     }
 

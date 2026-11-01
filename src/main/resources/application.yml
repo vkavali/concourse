@@ -35,6 +35,11 @@ concourse:
     stt-model: ${STT_MODEL:muse-voice-transcribe-1.0}
     stream: ${SPARK_STREAM:true}
     timeout-seconds: ${META_TIMEOUT_SECONDS:120}
+    open-base-url: ${SPARK_OPEN_BASE_URL:}
+    open-api-key: ${SPARK_OPEN_API_KEY:}
+    open-model: ${SPARK_OPEN_MODEL:meta-models/muse-spark-open-1026}
+    open-max-tokens: ${SPARK_OPEN_MAX_TOKENS:1024}
+    open-reasoning-effort: ${SPARK_OPEN_REASONING_EFFORT:low}
   tts:
     base-url: ${TTS_BASE_URL:}
     token: ${TTS_TOKEN:}

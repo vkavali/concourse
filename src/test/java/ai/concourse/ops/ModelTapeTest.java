@@ -70,7 +70,7 @@ class ModelTapeTest {
         assertEquals("muse-spark-1.3 (recording)", replayed.model());
         assertEquals(1, server.getRequestCount(), "no call was made");
         ModelCallLog.Entry last = calls.since(0).get(calls.since(0).size() - 1);
-        assertEquals("replayed from tape", last.note());
+        assertEquals("replayed from tape (muse-spark-1.3)", last.note());
         assertEquals("parent_turn", last.op());
 
         SparkClient.SparkException miss = assertThrows(SparkClient.SparkException.class,

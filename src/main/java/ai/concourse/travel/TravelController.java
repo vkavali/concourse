@@ -208,7 +208,18 @@ public class TravelController {
         if (last != null && now - last < FRAME_GAP_MS) return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("retry_ms", FRAME_GAP_MS - (now - last)));
         lastFrame.put(j.get().getId(), now);
         controller.onParentMessage(j.get());
-        SignEvidenceService.Assessment a = signs.assess(j.get(), image, contentType == null ? "image/jpeg" : contentType, "camera");
+        SignEvidenceService.Assessment a;
+        try {
+            a = signs.assess(j.get(), image, contentType == null ? "image/jpeg" : contentType, "camera");
+        } catch (ai.concourse.spark.SparkClient.SparkException e) {
+            // the live camera cannot be replayed from a tape: without a key the screen says so instead of guessing
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("kind", "UNAVAILABLE");
+            out.put("telugu", TeluguPhrases.CAMERA_UNAVAILABLE);
+            out.put("english", "Live sign reading needs MODEL_API_KEY: " + e.getMessage());
+            out.put("visible_text", List.of());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(out);
+        }
         String telugu = a.safeTelugu(safety);
         String clipId = hash(telugu).substring(0, 16);
         clips.put(clipId, telugu);

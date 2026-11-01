@@ -28,6 +28,8 @@ public final class TeluguPhrases {
     /** "Tap here; point the phone camera at the big board overhead; I will read it and tell you." */
     public static final String CAMERA_LINK = "ఇక్కడ నొక్కి, పైన ఉన్న పెద్ద బోర్డు వైపు ఫోన్ కెమెరా చూపించండి. నేను చదివి చెబుతాను.";
     public static final String CAMERA_LINK_BUTTON = "కెమెరా తెరవండి";   // open the camera
+    /** The camera cannot read right now (no live model): look at the card, ask staff. Never a guess. */
+    public static final String CAMERA_UNAVAILABLE = "ఇప్పుడు కెమెరా చదవలేకపోతోంది. కార్డు చూడండి, లేదా సిబ్బందిని అడగండి.";
 
     /** "No hurry. See the card. Point the camera at the board overhead and I will read it; if unsure, show the card to staff." */
     public static final String LOST = "తొందర లేదు. కార్డు చూడండి. కింద బటన్ నొక్కి, పైన ఉన్న పెద్ద బోర్డు వైపు ఫోన్ కెమెరా చూపించండి, నేను చదివి చెబుతాను. తెలియకపోతే ఈ కార్డు సిబ్బందికి చూపించండి.";

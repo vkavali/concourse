@@ -12,7 +12,7 @@ class SignatureVerifierTest {
             "http://localhost", "admin", "salt",
             new ConcourseProperties.WhatsApp("tok", "123", "verify", "secret", "http://graph"),
             new ConcourseProperties.Meta("k", "http://meta", "spark", "stt", true, 120),
-            null, null, null));
+            null, null, null, null));
 
     @Test
     void acceptsCorrectSignature() {

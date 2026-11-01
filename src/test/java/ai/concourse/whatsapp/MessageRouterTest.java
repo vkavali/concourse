@@ -31,7 +31,7 @@ class MessageRouterTest {
     private final ParentTurnService parentTurns = mock(ParentTurnService.class);
     private final JourneyController controller = mock(JourneyController.class);
     private final SignEvidenceService signs = mock(SignEvidenceService.class);
-    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
+    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null, null));
     private MessageRouter router;
 
     private static InboundMessage msg(InboundMessage.Type type, String text, String mediaId, String mime, String buttonId) {

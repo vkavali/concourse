@@ -52,7 +52,7 @@ class SignEvidenceServiceTest {
     private final TtsClient tts = mock(TtsClient.class);
     private final CardRenderer cards = mock(CardRenderer.class);
     private final ObjectMapper mapper = new ObjectMapper();
-    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
+    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null, null));
     private SignEvidenceService service;
     private JourneyEntity journey;
     private final StageEntity waiting = new StageEntity();

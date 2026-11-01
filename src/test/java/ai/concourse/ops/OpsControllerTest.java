@@ -108,8 +108,8 @@ class OpsControllerTest {
                 .andExpect(jsonPath("$.whatsapp", containsString("delivering")))
                 .andExpect(jsonPath("$.meta_api", containsString("muse-spark-1.3")))
                 .andExpect(jsonPath("$.tape", org.hamcrest.Matchers.startsWith("off")))
-                .andExpect(jsonPath("$.samples", isA(java.util.List.class)));
-        mvc.perform(get("/ops/models").header("X-Admin-Token", TOKEN)).andExpect(status().isOk()).andExpect(jsonPath("$", isA(java.util.List.class)));
+                .andExpect(jsonPath("$.samples").isArray());
+        mvc.perform(get("/ops/models").header("X-Admin-Token", TOKEN)).andExpect(status().isOk()).andExpect(jsonPath("$").isArray());
         mvc.perform(get("/ops/samples").header("X-Admin-Token", TOKEN)).andExpect(status().isOk());
         mvc.perform(post("/ops/journeys/latest/sample/..%2Fsecret.wav").header("X-Admin-Token", TOKEN)).andExpect(status().is4xxClientError());
         mvc.perform(post("/ops/journeys/latest/sample/nothing-here.wav").header("X-Admin-Token", TOKEN)).andExpect(status().isNotFound());

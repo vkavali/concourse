@@ -28,7 +28,7 @@ class TicketIngestServiceTest {
     private final JourneyService journeys = mock(JourneyService.class);
     private final EventLog eventLog = mock(EventLog.class);
     private final JourneyController controller = mock(JourneyController.class);
-    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
+    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null, null));
     private TicketIngestService service;
 
     @BeforeEach

@@ -55,7 +55,7 @@ class ParentTurnServiceTest {
     private final EventLog eventLog = mock(EventLog.class);
     private final ObjectMapper mapper = new ObjectMapper();
     private final CardRenderer cards = mock(CardRenderer.class);
-    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
+    private final PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null, null));
     private ParentMessenger messenger;
     private ParentTurnService service;
     private JourneyEntity journey;

@@ -45,7 +45,7 @@ class OutboxChannelTest {
         channel.sendLinkButton("919876543210", "open", "తెరవండి", "https://example.test/travel.html#x");
 
         assertTrue(id.startsWith("outbox-"));
-        verify(delegate, never()).sendVoiceNote(any(), any());
+        verify(delegate, never()).sendVoiceNote(any(), any(byte[].class));
         verify(delegate, never()).sendImage(any(), any(byte[].class), any());
         verify(delegate, never()).sendLinkButton(any(), any(), any(), any());
         assertFalse(channel.delivering());

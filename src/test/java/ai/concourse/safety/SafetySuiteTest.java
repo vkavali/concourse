@@ -153,7 +153,7 @@ class SafetySuiteTest {
         ContactService contacts = mock(ContactService.class);
         CardRenderer cards = mock(CardRenderer.class);
         ObjectMapper mapper = new ObjectMapper();
-        PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null));
+        PhoneHasher hasher = new PhoneHasher(new ConcourseProperties("http://x", "a", "salt", null, null, null, null, null, null));
         ParentMessenger messenger = new ParentMessenger(channel, tts, safety, cards, new SignCardRenderer(), contacts, journeys, new Airports(), new TravelLinks("salt", "http://x"));
         ParentTurnService service = new ParentTurnService(channel, mock(AudioTranscoder.class), stt, spark, new PromptLoader(mapper), journeys, controller,
                 messenger, hasher, mock(EventLog.class), mapper);

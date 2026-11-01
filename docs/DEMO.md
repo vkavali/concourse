@@ -1,10 +1,12 @@
 # Concourse — Demo video script (3:00) and live-demo notes
 
-## Rules
-- Open with a real person, not a slide. No market numbers until the last 5 seconds, if at all.
+## Rules (updated Nov 1 from the organizers' answers — docs/HACKATHON_INTEL.md)
+- First line, spoken, over the first shot: "Everything you see was built between Oct 26 and Nov 4." Then a real person, not a slide.
+- 3:00 hard stop (judges stop the video there). A human presenter is preferred; English subtitles under every Telugu line.
+- The live Meta model calls must be **visible**: the simulator's "Meta model calls" ticker (model id · operation · ms) sits on screen whenever a model is working. That is the provenance judges asked for.
 - Every simulated element is labeled on screen ("demo operations event").
-- Show the model's structured output in a small developer pane at least twice — judges must see Meta's models doing real work.
-- Never show a dashboard. Two phones, side by side.
+- Never show a dashboard as the product. Two phones, side by side; the simulator only as the console/ticker.
+- No "coming next" segment — future plans go in the written submission.
 
 ## Script
 
@@ -49,9 +51,12 @@ N/N instructions understood · 0 invented directions
 3. Real parent + route replay with real airport signs
 4. Developer pretending — do not ship this
 
-## Live product for judges
-- A real WhatsApp number anyone can message; a sample ticket PDF linked from the README; English fallback for judges who don't speak Telugu (the parent language is per-journey).
-- Simulator page (optional) labeled SIMULATOR for judges who won't enroll a phone.
+## Judges (what they actually do)
+- They run the repo from the README and watch the video; hosting and phones are optional. The judge path (`TAPE_MODE=replay`,
+  README "Run the demo in five minutes") must reproduce every scene above from the simulator, and `eval/sample-run/README.md`
+  says what is recorded and what is rendered.
+- The written submission carries what the video cannot: the safety contract, the eval numbers (`eval/safety/RESULTS.md`,
+  `eval/latency/RESULTS.md`), and what comes next.
 
 ## Recording
 - Screen-record both phones (Android screen record; iPhone if the child uses one). Film the parent's face with consent. Capture the developer pane from the backend log viewer.

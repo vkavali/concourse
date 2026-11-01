@@ -93,7 +93,23 @@ public class SignEvidenceService {
         if (tape != null) tape.saveInput("sign", image, mimeType != null && mimeType.contains("png") ? "png" : "jpg"); // record mode: a photo she sent, not camera frames
         controller.onParentMessage(j);
         String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);
-        Assessment a = assess(j, image, mimeType, source);
+        Assessment a;
+        try {
+            a = assess(j, image, mimeType, source);
+        } catch (RuntimeException e) {
+            // the reader failed (model down, no key): she hears it in Telugu and gets her card; nothing is guessed
+            log.warn("sign reading failed ({}); told her to send it again", e.getMessage());
+            eventLog.record(j.getId(), EventLog.ACTOR_SYSTEM, "sign_failed", Map.of("source", source, "error", String.valueOf(e.getMessage())));
+            if (parentWaId != null) {
+                Optional<StageEntity> current = controller.current(j);
+                StageType stage = current.map(StageEntity::stageType).filter(t -> t != StageType.PRE_TRIP).orElse(StageType.WAITING_AT_ORIGIN);
+                JourneyFacts facts = messenger.facts(j);
+                if (stage.showsGateCard()) messenger.sendGateCard(parentWaId, facts, current.map(StageEntity::getSegmentSeq).orElse(1));
+                else messenger.sendSignCard(parentWaId, stage, facts, current.map(StageEntity::getSegmentSeq).orElse(1));
+                messenger.speak(parentWaId, TeluguPhrases.PHOTO_FAILED, null, facts);
+            }
+            throw e;
+        }
         if (parentWaId != null) {
             if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) {
                 if (a.stage().showsGateCard()) messenger.sendGateCard(parentWaId, a.facts(), a.segmentSeq());

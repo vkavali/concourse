@@ -158,6 +158,15 @@ class SignEvidenceServiceTest {
     }
 
     @Test
+    void aFailedReaderSendsHerCardAndATeluguLineNeverSilence() {
+        when(spark.completeJson(any(SparkRequest.class), eq(SignObservation.class), any(ObjectMapper.class)))
+                .thenThrow(new ai.concourse.spark.SparkClient.SparkException(503, "down", true));
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> service.handlePhoto(PARENT, "img1", "image/jpeg"));
+        verify(channel).sendText(PARENT, TeluguPhrases.PHOTO_FAILED);
+        verify(channel).sendImage(eq(PARENT), any(), contains("B12"));
+    }
+
+    @Test
     void unknownParentGetsNotSetUp() {
         when(journeys.latestForParent(any())).thenReturn(Optional.empty());
         service.handlePhoto("910000000000", "img1", "image/jpeg");

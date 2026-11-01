@@ -219,6 +219,25 @@ class ParentTurnServiceTest {
     }
 
     @Test
+    void aFailedTranscriptionOrClassificationNeverLeavesHerInSilence() {
+        when(stt.transcribeWav(any(), any())).thenThrow(new SttClient.SttException(503, "down"));
+        ParentTurnService.Reply r = service.handleAudio(journey, new byte[100], "whatsapp");
+        assertEquals("retry", r.outcome());
+        verify(channel).sendButtons(eq(PARENT), eq(TeluguPhrases.TRY_AGAIN), any());
+
+        reset(stt);
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "గేట్ ఎక్కడ", 2000));
+        when(spark.completeJson(any(SparkRequest.class), eq(ParentTurn.class), any(ObjectMapper.class)))
+                .thenThrow(new SparkClient.SparkException(0, "request failed: timeout", true));
+        r = service.handleAudio(journey, new byte[100], "whatsapp");
+        assertEquals("clarify", r.outcome());
+        verify(channel).sendButtons(eq(PARENT), eq(TeluguPhrases.CLARIFY), any());
+
+        service.apologize(PARENT);
+        verify(channel, times(2)).sendButtons(eq(PARENT), eq(TeluguPhrases.TRY_AGAIN), any());
+    }
+
+    @Test
     void emptyTranscriptAsksAgainWithoutCallingSpark() {
         when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "", 500));
         service.handleVoiceNote(PARENT, "m1");

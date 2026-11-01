@@ -102,6 +102,11 @@ public class ParentTurnService {
         handleAudio(journey.get(), wav, "whatsapp", t0, t1, t2);
     }
 
+    /** The last resort when something on our side failed: "say it again", in Telugu, with her three buttons. */
+    public void apologize(String parentWaId) {
+        messenger.speak(parentWaId, TeluguPhrases.TRY_AGAIN, PARENT_BUTTONS, null);
+    }
+
     /** Her voice from anywhere (WhatsApp note, the travel screen's microphone), already converted to 16 kHz WAV. */
     public Reply handleAudio(JourneyEntity j, byte[] wav, String source) {
         long now = System.currentTimeMillis();
@@ -113,17 +118,33 @@ public class ParentTurnService {
         controller.onParentMessage(j);
         JourneyFacts facts = messenger.facts(j);
         String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);
-        SttClient.Transcript transcript = stt.transcribeWav(wav, VoiceNoteService.PARENT_LANGUAGE_BIAS);
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("source", source);
+        SttClient.Transcript transcript;
+        try {
+            transcript = stt.transcribeWav(wav, VoiceNoteService.PARENT_LANGUAGE_BIAS);
+        } catch (RuntimeException e) {
+            // Voice Transcribe is down or refused the audio: she hears a Telugu "say it again" with the buttons, never silence
+            log.warn("transcription failed ({}); asking her to say it again", e.getMessage());
+            event.put("error", "stt: " + e.getMessage());
+            if (parentWaId != null) messenger.speak(parentWaId, TeluguPhrases.TRY_AGAIN, PARENT_BUTTONS, facts);
+            event.put("outcome", "retry");
+            eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "voice_turn", event);
+            return new Reply("retry", TeluguPhrases.TRY_AGAIN, "ERROR");
+        }
         long t3 = System.currentTimeMillis();
 
         ParentTurn turn = null;
         if (!transcript.isEmpty()) {
-            turn = interpret(transcript.text(), facts);
+            try {
+                turn = interpret(transcript.text(), facts);
+            } catch (RuntimeException e) {
+                log.warn("intent classification failed ({}); asking her to say it again", e.getMessage());
+                event.put("error", "spark: " + e.getMessage());
+            }
         }
         long t4 = System.currentTimeMillis();
 
-        Map<String, Object> event = new LinkedHashMap<>();
-        event.put("source", source);
         event.put("audio_ms", transcript.audioDurationMs());
         event.put("transcript_chars", transcript.text().length());
         Reply reply;

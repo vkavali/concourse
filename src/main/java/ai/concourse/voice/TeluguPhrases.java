@@ -28,6 +28,10 @@ public final class TeluguPhrases {
     /** "Tap here; point the phone camera at the big board overhead; I will read it and tell you." */
     public static final String CAMERA_LINK = "ఇక్కడ నొక్కి, పైన ఉన్న పెద్ద బోర్డు వైపు ఫోన్ కెమెరా చూపించండి. నేను చదివి చెబుతాను.";
     public static final String CAMERA_LINK_BUTTON = "కెమెరా తెరవండి";   // open the camera
+    /** Something on our side failed mid-turn: she hears it in Telugu, with the three buttons, never silence or English. */
+    public static final String TRY_AGAIN = "క్షమించండి, నాకు ఇప్పుడు వినిపించలేదు. ఇంకోసారి చెప్పండి, లేదా కింద బటన్ నొక్కండి.";
+    /** The photo could not be read right now (model failed): ask again, or the card to staff. */
+    public static final String PHOTO_FAILED = "క్షమించండి, ఈ ఫోటో ఇప్పుడు చదవలేకపోయాను. మళ్ళీ తీసి పంపండి, లేదా కార్డు సిబ్బందికి చూపించండి.";
     /** The camera cannot read right now (no live model): look at the card, ask staff. Never a guess. */
     public static final String CAMERA_UNAVAILABLE = "ఇప్పుడు కెమెరా చదవలేకపోతోంది. కార్డు చూడండి, లేదా సిబ్బందిని అడగండి.";
 

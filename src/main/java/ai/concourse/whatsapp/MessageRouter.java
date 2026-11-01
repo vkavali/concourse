@@ -94,7 +94,11 @@ public class MessageRouter implements InboundMessageHandler {
         } catch (Exception e) {
             log.error("handling {} from {} failed", m.type(), PhoneHasher.redact(from), e);
             try {
-                whatsApp.sendText(from, "Something went wrong on my side. Please try again in a minute.");
+                if (contacts.roleOf(from) == ContactEntity.Role.PARENT) {
+                    parentTurns.apologize(from); // she never reads English: a Telugu voice note with her buttons
+                } else {
+                    whatsApp.sendText(from, "Something went wrong on my side. Please try again in a minute.");
+                }
             } catch (Exception ignored) {
             }
         }

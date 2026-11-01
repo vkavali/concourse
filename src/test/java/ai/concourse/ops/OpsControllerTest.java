@@ -32,6 +32,7 @@ class OpsControllerTest {
     private static final String TOKEN = "test-admin"; // application-test.yml
     @Autowired MockMvc mvc;
     @Autowired JourneyRepository journeys;
+    @Autowired ai.concourse.journey.ConcourseClock clock;
     @MockBean WhatsAppClient whatsApp;
     @MockBean TtsClient tts;
     @MockBean InboundMessageHandler handler;
@@ -40,6 +41,7 @@ class OpsControllerTest {
     void setUp() {
         when(whatsApp.isConfigured()).thenReturn(true); // a mocked WhatsApp still "delivers": the tests verify what it is sent
         journeys.deleteAll();
+        clock.reset(); // another test may have left the journey clock travelling
         when(tts.isConfigured()).thenReturn(false);
     }
 

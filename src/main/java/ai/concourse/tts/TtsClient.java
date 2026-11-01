@@ -6,6 +6,7 @@ import ai.concourse.config.ConcourseProperties;
 import ai.concourse.ops.ModelCallLog;
 import ai.concourse.ops.ModelTape;
 import com.fasterxml.jackson.databind.JsonNode;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,7 +56,6 @@ public class TtsClient {
     private final int speaker;
     private final String modelLabel;
     private volatile String resolvedModel;
-    private volatile long healthRetryAt;
     private ModelCallLog callLog;   // optional
     private ModelTape tape;         // optional
     private final ExecutorService pool = Executors.newFixedThreadPool(4, r -> {
@@ -106,21 +106,26 @@ public class TtsClient {
 
     public boolean hasServer() { return serverConfigured; }
 
-    /** The model id behind the voice: what the server's {@code /health} reports, else the configured label. */
+    /** The model id behind the voice: what the server's {@code /health} reported at start-up, else the configured label. */
     public String modelId() {
         String m = resolvedModel;
-        if (m != null) return m;
-        if (!serverConfigured) return resolvedModel = modelLabel;
-        if (System.currentTimeMillis() < healthRetryAt) return modelLabel;
-        try {
-            JsonNode h = client.get().uri("/health").retrieve().bodyToMono(JsonNode.class).block(Duration.ofSeconds(8));
-            String reported = h == null ? null : h.path("model").asText(null);
-            return resolvedModel = reported == null || reported.isBlank() ? modelLabel : reported;
-        } catch (RuntimeException e) {
-            log.debug("tts /health not answering ({}); using label {}", e.getMessage(), modelLabel);
-            healthRetryAt = System.currentTimeMillis() + 60_000; // ask again in a minute, not on every note
-            return modelLabel;
-        }
+        return m != null ? m : modelLabel;
+    }
+
+    /** Asks the TTS server which Meta model it serves — once, in the background, so no note ever waits for it. */
+    @PostConstruct
+    void resolveModel() {
+        if (!serverConfigured) return;
+        pool.submit(() -> {
+            try {
+                JsonNode h = client.get().uri("/health").retrieve().bodyToMono(JsonNode.class).block(Duration.ofSeconds(8));
+                String reported = h == null ? null : h.path("model").asText(null);
+                if (reported != null && !reported.isBlank()) resolvedModel = reported;
+                log.info("tts server model: {}", modelId());
+            } catch (RuntimeException e) {
+                log.debug("tts /health not answering ({}); using label {}", e.getMessage(), modelLabel);
+            }
+        });
     }
 
     /** OGG/Opus mono bytes ready for {@code WhatsAppClient.uploadMedia(bytes, "audio/ogg", "note.ogg")}. */

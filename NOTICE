@@ -1,0 +1,10 @@
+Concourse
+Copyright 2026 vkavali (github.com/vkavali)
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Models used at runtime are Meta models under their own licenses:
+- Muse Spark 1.3 and Muse Voice Transcribe 1.0 via the Meta Model API (standard tier).
+- SeamlessM4T v2 (facebook/seamless-m4t-v2-large) and MMS-TTS Telugu (facebook/mms-tts-tel): Meta open weights, CC-BY-NC 4.0,
+  served from our own Modal deployment (modal/).
+Airport data: OpenFlights (ODbL). Fonts: see src/main/resources/fonts/LICENSES.md.

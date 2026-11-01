@@ -5,15 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Concourse Simulator</title>
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --ink:#e8eaf0; --mute:#9aa3b2; --parent:#1f6f4a; --child:#2a4d8f; --amber:#b45f06; --red:#8f2a2a; }
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --ink:#e8eaf0; --mute:#9aa3b2; --parent:#1f6f4a; --child:#2a4d8f; --amber:#b45f06; --red:#8f2a2a; --ok:#7fd3a3; --bad:#ff8a8a; }
   * { box-sizing:border-box; }
   body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-  header { display:flex; align-items:center; gap:14px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:2; }
+  body.demo { font-size:17px; }
+  header { display:flex; align-items:center; gap:14px; padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:2; flex-wrap:wrap; }
   header h1 { font-size:16px; margin:0; letter-spacing:.3px; }
   .tag { font-size:11px; padding:2px 8px; border-radius:999px; background:var(--amber); color:#fff; font-weight:600; letter-spacing:.5px; }
+  .tag.replay { background:#4a3a8f; }
   .clock { margin-left:auto; color:var(--mute); font-variant-numeric:tabular-nums; }
-  main { display:grid; grid-template-columns: 300px 1fr 1fr; gap:12px; padding:12px 16px; min-height:calc(100vh - 52px); }
-  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+  #mode { color:var(--mute); font-size:12px; width:100%; }
+  main { display:grid; grid-template-columns: 300px 1fr 1fr 320px; gap:12px; padding:12px 16px; min-height:calc(100vh - 52px); }
+  @media (max-width: 1300px) { main { grid-template-columns: 300px 1fr 1fr; } .panel.ticker { grid-column: 1 / -1; } }
+  @media (max-width: 1000px) { main { grid-template-columns: 1fr; } .panel.ticker { grid-column: auto; } }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; display:flex; flex-direction:column; min-height:0; }
   .panel h2 { font-size:12px; text-transform:uppercase; letter-spacing:.8px; color:var(--mute); margin:0 0 10px; }
   label { display:block; font-size:12px; color:var(--mute); margin:8px 0 4px; }
@@ -22,11 +26,12 @@
   button:hover { background:#2c3344; }
   button.primary { background:var(--parent); border-color:transparent; }
   button.danger { background:var(--amber); border-color:transparent; }
+  button.sample { background:#1e2a3d; }
   button:disabled { opacity:.45; cursor:default; }
   .row { display:flex; gap:8px; } .row > * { flex:1; }
   .stages { margin-top:10px; font-size:12px; }
   .stage { display:flex; gap:8px; padding:4px 0; border-top:1px solid var(--line); color:var(--mute); }
-  .stage.SENT { color:var(--ink); } .stage.ACKED { color:#7fd3a3; } .stage.SKIPPED { text-decoration:line-through; } .stage.HELD { color:#f0b35a; }
+  .stage.SENT { color:var(--ink); } .stage.ACKED { color:var(--ok); } .stage.SKIPPED { text-decoration:line-through; } .stage.HELD { color:#f0b35a; }
   .stage .seq { width:18px; text-align:right; } .stage .type { flex:1; } .stage .when { font-variant-numeric:tabular-nums; }
   .phone { display:flex; flex-direction:column; }
   .phone .feed { flex:1; overflow:auto; display:flex; flex-direction:column; gap:8px; padding:4px 2px; }
@@ -35,17 +40,30 @@
   .msg .meta { font-size:11px; color:var(--mute); margin-bottom:3px; }
   .msg .btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
   .msg .btns span { font-size:12px; padding:3px 8px; border:1px solid var(--line); border-radius:999px; }
+  .msg audio { width:100%; margin-top:4px; }
+  .msg img.card { width:100%; border-radius:8px; margin-top:4px; background:#fff; }
+  .msg a { color:#7fb0ff; }
   .voice { font-weight:600; } .img { font-style:italic; color:var(--mute); }
   .status { font-size:12px; color:var(--mute); margin-top:8px; min-height:18px; }
-  .err { color:#ff8a8a; }
+  .err { color:var(--bad); }
+  .ticker { font-variant-numeric:tabular-nums; }
+  .ticker .calls { flex:1; overflow:auto; display:flex; flex-direction:column; gap:4px; font-size:12px; }
+  .call { display:grid; grid-template-columns: 54px 1fr auto; gap:6px; padding:5px 6px; border-radius:6px; background:#1b2029; border-left:3px solid var(--ok); }
+  .call.bad { border-left-color:var(--bad); }
+  .call .model { color:#9ecbff; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .call .op { color:var(--ink); }
+  .call .note { grid-column: 2 / -1; color:var(--mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .call .ms { color:var(--mute); }
+  .legend { font-size:11px; color:var(--mute); margin-top:8px; line-height:1.5; }
 </style>
 </head>
 <body>
 <header>
   <h1>Concourse</h1>
-  <span class="tag">SIMULATOR</span>
-  <span style="color:var(--mute)">simulated operations events · real WhatsApp messages go to the registered phones</span>
+  <span class="tag" id="simTag">SIMULATOR</span>
+  <span style="color:var(--mute)">simulated operations events · everything else is the real app</span>
   <span class="clock" id="clock">clock: —</span>
+  <div id="mode"></div>
 </header>
 <main>
   <section class="panel">
@@ -63,6 +81,7 @@
       <button onclick="act('ack')">She taps "done ✓"</button>
       <button onclick="act('here')">She taps "I'm here"</button>
     </div>
+    <div id="samples"></div>
     <label>Gate change (the demo's operations event)</label>
     <div class="row">
       <input id="seg" value="2" title="flight number in the itinerary (1 or 2)">
@@ -73,6 +92,7 @@
       <button onclick="setClock({reset:true})">Clock → real time</button>
       <button onclick="act('tick')">Run scheduler tick</button>
     </div>
+    <button onclick="document.body.classList.toggle('demo')">Bigger type (for recording)</button>
     <div class="status" id="status"></div>
     <div class="status" id="travel"></div>
     <div class="stages" id="stages"></div>
@@ -87,10 +107,16 @@
     <h2>Child's phone (English)</h2>
     <div class="feed" id="childFeed"></div>
   </section>
+
+  <section class="panel ticker">
+    <h2>Meta model calls (live)</h2>
+    <div class="calls" id="calls"></div>
+    <div class="legend">Every call the app makes, as it happens: model id · what for · time. "replayed from tape" means a recording from a real run is being served because no key is set.</div>
+  </section>
 </main>
 <script>
   const $ = id => document.getElementById(id);
-  let lastSeq = 0;
+  let lastSeq = 0, lastCall = 0, samplesLoaded = false;
   for (const k of ['token','child','parent']) { try { $(k).value = localStorage.getItem('sim.'+k) || ''; } catch (e) {} $(k).addEventListener('change', () => { try { localStorage.setItem('sim.'+k, $(k).value.trim()); } catch (e) {} }); }
 
   function headers() { return {'Content-Type':'application/json', 'X-Admin-Token': $('token').value.trim()}; }
@@ -104,7 +130,7 @@
 
   async function demo() {
     try {
-      const d = await call('POST', '/ops/demo', {child: $('child').value.trim(), parent: $('parent').value.trim(), days_ahead: 2});
+      const d = await call('POST', '/ops/demo', {child: $('child').value.trim() || '10000000000', parent: $('parent').value.trim(), days_ahead: 2});
       say('Demo journey ' + d.journey_id.slice(0,8) + ' for ' + d.date + (d.parent_is_child ? ' (one phone plays both)' : '') + ' — intro sent.');
       lastSeq = 0; $('parentFeed').innerHTML = ''; $('childFeed').innerHTML = '';
       refresh();
@@ -112,6 +138,11 @@
   }
   async function act(action) {
     try { const d = await call('POST', '/ops/journeys/latest/' + action); say(action + ' → ' + JSON.stringify(d)); refresh(); }
+    catch (e) { say(e.message, true); }
+  }
+  async function sample(name) {
+    say('sending ' + name + ' …');
+    try { const d = await call('POST', '/ops/journeys/latest/sample/' + encodeURIComponent(name)); say(name + ' → ' + (d.verdict || d.intent || d.outcome || '') + (d.error ? ' · ' + d.error : '')); refresh(); }
     catch (e) { say(e.message, true); }
   }
   async function gateChange() {
@@ -123,6 +154,31 @@
   async function setClock(body) { try { const d = await call('POST', '/ops/clock', body); say('clock: ' + d.now); refresh(); } catch (e) { say(e.message, true); } }
 
   function fmt(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleString(undefined, {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'}); }
+  function esc(s) { return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function linkify(s) { return esc(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>'); }
+
+  async function loadStatus() {
+    try {
+      const s = await call('GET', '/ops/status');
+      const replaying = /^replay/.test(s.tape);
+      $('mode').textContent = 'WhatsApp: ' + s.whatsapp + ' · Meta Model API: ' + s.meta_api + ' · voice: ' + s.tts + ' · tape: ' + s.tape;
+      $('simTag').textContent = replaying ? 'JUDGE PATH · REPLAYING A RECORDED RUN' : 'SIMULATOR';
+      $('simTag').className = 'tag' + (replaying ? ' replay' : '');
+      if (!samplesLoaded) {
+        samplesLoaded = true;
+        if (s.samples && s.samples.length) {
+          $('samples').innerHTML = '<label>Her samples from a recorded run (voice notes go through transcription + the turn; photos through the sign reader)</label>'
+            + s.samples.map(n => '<button class="sample" onclick="sample(\'' + n.replace(/'/g, '') + '\')">' + (n.endsWith('.wav') ? '🎤 ' : '📷 ') + esc(n) + '</button>').join('');
+        }
+      }
+    } catch (e) { /* no token yet */ }
+  }
+
+  async function media(seq) {
+    const r = await fetch('/ops/outbox/' + seq + '/media', {headers: headers()});
+    if (!r.ok) return null;
+    return URL.createObjectURL(await r.blob());
+  }
 
   async function refresh() {
     if (!$('token').value.trim()) return;
@@ -142,16 +198,38 @@
         if (e.kind === 'voice') body = '<span class="voice">🔊 voice note</span> <span class="img">(' + Math.round(e.bytes/1024) + ' KB)</span>';
         else if (e.kind === 'image') body = '<span class="img">🖼 card · ' + esc(e.text) + '</span>';
         else if (e.kind === 'template') body = '<span class="img">📨 template ' + esc(e.text) + '</span>';
-        else body = esc(e.text);
+        else body = linkify(e.text);
         if (e.buttons && e.buttons.length) body += '<div class="btns">' + e.buttons.map(b => '<span>' + esc(b) + '</span>').join('') + '</div>';
         div.innerHTML = '<div class="meta">' + new Date(e.at).toLocaleTimeString() + ' · ' + e.kind + '</div>' + body;
         feed.appendChild(div);
+        if (e.mediaType) {
+          media(e.seq).then(url => {
+            if (!url) return;
+            if (e.mediaType.startsWith('audio')) { const a = document.createElement('audio'); a.controls = true; a.src = url; div.appendChild(a); }
+            else { const im = document.createElement('img'); im.className = 'card'; im.src = url; div.appendChild(im); }
+            feed.scrollTop = feed.scrollHeight;
+          });
+        }
         feed.scrollTop = feed.scrollHeight;
       }
     } catch (e) { if (!/no journey/.test(e.message)) say(e.message, true); }
+    try {
+      const calls = await call('GET', '/ops/models?after=' + lastCall);
+      for (const c of calls) {
+        lastCall = Math.max(lastCall, c.seq);
+        const div = document.createElement('div');
+        div.className = 'call' + (c.ok ? '' : ' bad');
+        const t = new Date(c.at).toLocaleTimeString([], {hour12:false});
+        div.innerHTML = '<span class="ms">' + t.slice(0,8) + '</span><span class="model">' + esc(c.model) + '</span><span class="ms">' + (c.ms >= 1000 ? (c.ms/1000).toFixed(1) + ' s' : c.ms + ' ms') + '</span>'
+          + '<span class="note">' + esc(c.op) + (c.note ? ' · ' + esc(c.note) : '') + '</span>';
+        $('calls').appendChild(div);
+        $('calls').scrollTop = $('calls').scrollHeight;
+      }
+    } catch (e) { /* ignore */ }
   }
-  function esc(s) { return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
   setInterval(refresh, 2000);
+  setInterval(loadStatus, 10000);
+  loadStatus();
   refresh();
 </script>
 </body>

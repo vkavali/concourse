@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -37,6 +38,7 @@ class OpsControllerTest {
 
     @BeforeEach
     void setUp() {
+        when(whatsApp.isConfigured()).thenReturn(true); // a mocked WhatsApp still "delivers": the tests verify what it is sent
         journeys.deleteAll();
         when(tts.isConfigured()).thenReturn(false);
     }
@@ -95,5 +97,33 @@ class OpsControllerTest {
                 .content("{\"child\":\"17165550123\"}")).andExpect(status().isOk());
         mvc.perform(post("/ops/clock").header("X-Admin-Token", TOKEN).contentType(MediaType.APPLICATION_JSON).content("{\"reset\":true}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.travelling", is(false)));
+    }
+
+    /** What the simulator shows a viewer: what is live, the model calls, the cards it can display, the samples it can send. */
+    @Test
+    void statusModelsSamplesAndMediaForTheSimulator() throws Exception {
+        mvc.perform(get("/ops/status")).andExpect(status().isForbidden());
+        mvc.perform(get("/ops/status").header("X-Admin-Token", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.whatsapp", containsString("delivering")))
+                .andExpect(jsonPath("$.meta_api", containsString("muse-spark-1.3")))
+                .andExpect(jsonPath("$.tape", org.hamcrest.Matchers.startsWith("off")))
+                .andExpect(jsonPath("$.samples", isA(java.util.List.class)));
+        mvc.perform(get("/ops/models").header("X-Admin-Token", TOKEN)).andExpect(status().isOk()).andExpect(jsonPath("$", isA(java.util.List.class)));
+        mvc.perform(get("/ops/samples").header("X-Admin-Token", TOKEN)).andExpect(status().isOk());
+        mvc.perform(post("/ops/journeys/latest/sample/..%2Fsecret.wav").header("X-Admin-Token", TOKEN)).andExpect(status().is4xxClientError());
+        mvc.perform(post("/ops/journeys/latest/sample/nothing-here.wav").header("X-Admin-Token", TOKEN)).andExpect(status().isNotFound());
+
+        mvc.perform(post("/ops/demo").header("X-Admin-Token", TOKEN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"child\":\"17165550124\"}")).andExpect(status().isOk());
+        mvc.perform(post("/ops/journeys/latest/consent").header("X-Admin-Token", TOKEN)).andExpect(status().isOk());
+        mvc.perform(post("/ops/journeys/latest/next").header("X-Admin-Token", TOKEN)).andExpect(status().isOk());
+        String outbox = mvc.perform(get("/ops/outbox").header("X-Admin-Token", TOKEN)).andReturn().getResponse().getContentAsString();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"seq\":(\\d+),[^}]*\"kind\":\"image\"").matcher(outbox);
+        org.junit.jupiter.api.Assertions.assertTrue(m.find(), "the stage sent a card: " + outbox);
+        mvc.perform(get("/ops/outbox/" + m.group(1) + "/media").header("X-Admin-Token", TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png"));
+        mvc.perform(get("/ops/outbox/999999/media").header("X-Admin-Token", TOKEN)).andExpect(status().isNotFound());
     }
 }

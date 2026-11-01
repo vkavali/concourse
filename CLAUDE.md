@@ -19,7 +19,7 @@ CUT: Hindi, immigration rehearsal, boarding-pass verification, Muse connector, M
 ## Stack
 
 - Backend: Java 21, Spring Boot 3, PostgreSQL, Flyway, Spring Scheduler (DB-backed jobs table). Single deployable. Hosted on a public HTTPS URL (Fly.io or Railway) — WhatsApp webhooks require it.
-- Clients: WhatsApp Business Cloud API; Meta Model API (Muse Spark 1.3, Muse Voice Transcribe); text-to-speech = Meta's open-source **MMS-TTS Telugu** (`facebook/mms-tts-tel`) served on Modal (Meta has no TTS API); Google Chirp 3 HD `te-IN` only as fallback if the MMS voice fails the Day-1 intelligibility test with a real parent; ffmpeg for audio transcoding; FlightAware AeroAPI optional (demo uses a labeled simulated event).
+- Clients: WhatsApp Business Cloud API; Meta Model API (Muse Spark 1.3, Muse Voice Transcribe); text-to-speech = Meta open weights served on Modal — **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, `TTS_SPEAKER` 0-199) or **MMS-TTS Telugu** (`facebook/mms-tts-tel`); Meta has no TTS API and **no non-Meta voice may be called at runtime (hackathon rule, Nov 1 — see docs/HACKATHON_INTEL.md)**; ffmpeg for audio transcoding; FlightAware AeroAPI optional (demo uses a labeled simulated event).
 - Optional: Next.js simulator page (two-phone view of the event log, labeled "simulator"); Kotlin Android Travel Mode.
 - Repo is PUBLIC. No secrets, no tickets, no voice notes, no phone numbers in git. `.env.example` only.
 
@@ -40,6 +40,10 @@ CUT: Hindi, immigration rehearsal, boarding-pass verification, Muse connector, M
 - Graph API version `v25.0` (what the console generates in Oct 2026). Error `131031 Business Account locked` = the WhatsApp Business Account is restricted; nothing sends until an appeal clears.
 - Oct 27 lesson: a brand-new Facebook account's test WABA was auto-locked within 10 h. Use an aged account for the developer app; keep the messaging layer swappable (`MessagingChannel`) so a Twilio WhatsApp Sandbox adapter can stand in.
 - Policy: Concourse is a task-bound travel-assistance bot with human handoff (the child). Never add open-ended chat.
+
+## Judge path (Nov 1)
+
+Judges run the repo themselves; hosting is optional. `TAPE_MODE=replay` serves a recorded run from `eval/sample-run/` (model outputs by input hash, her sample voice notes and photos, the synthesized notes) so the whole demo runs on a laptop with no keys and no WhatsApp; `TAPE_MODE=record` writes that folder during a real run. The simulator (`/sim.html`) is the console: both phones, playable voice notes and cards, her samples as buttons, and a ticker of every Meta model call (id, operation, ms — "replayed from tape" when it is). Every outbound still goes through the same code; only the transport and the model answers are recorded.
 
 ## Architecture (see docs/ARCHITECTURE.md)
 

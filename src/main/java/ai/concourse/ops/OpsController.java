@@ -2,6 +2,10 @@ package ai.concourse.ops;
 
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.config.ConcourseProperties;
+import ai.concourse.evidence.SignEvidenceService;
+import ai.concourse.spark.SparkClient;
+import ai.concourse.tts.TtsClient;
+import ai.concourse.voice.ParentTurnService;
 import ai.concourse.itinerary.Itinerary;
 import ai.concourse.itinerary.ItineraryValidator;
 import ai.concourse.itinerary.ValidatedItinerary;
@@ -17,6 +21,7 @@ import ai.concourse.journey.StageEntity;
 import ai.concourse.travel.TravelLinks;
 import ai.concourse.whatsapp.OutboxChannel;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +32,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -56,10 +64,23 @@ public class OpsController {
     private final EventRepository events;
     private final OutboxChannel outbox;
     private final TravelLinks travelLinks;
+    private final ModelCallLog calls;
+    private final ModelTape tape;
+    private final ParentTurnService parentTurns;
+    private final SignEvidenceService signs;
+    private final TtsClient tts;
+    private final SparkClient spark;
 
     public OpsController(ConcourseProperties props, JourneyController controller, JourneyService journeys, ConcourseClock clock,
                          ItineraryValidator validator, ContactService contacts, PhoneHasher hasher, EventRepository events,
-                         OutboxChannel outbox, TravelLinks travelLinks) {
+                         OutboxChannel outbox, TravelLinks travelLinks, ModelCallLog calls, ModelTape tape,
+                         ParentTurnService parentTurns, SignEvidenceService signs, TtsClient tts, SparkClient spark) {
+        this.calls = calls;
+        this.tape = tape;
+        this.parentTurns = parentTurns;
+        this.signs = signs;
+        this.tts = tts;
+        this.spark = spark;
         this.travelLinks = travelLinks;
         this.props = props;
         this.controller = controller;
@@ -120,6 +141,7 @@ public class OpsController {
     public ResponseEntity<?> demo(@RequestHeader(value = "X-Admin-Token", required = false) String token, @RequestBody DemoRequest r) {
         if (!authorized(token)) return forbidden();
         String child = PhoneHasher.normalize(r.child() == null ? "" : r.child());
+        if (child.length() < 10 && !outbox.delivering()) child = "10000000000"; // no WhatsApp: the simulator is the only phone
         String parent = PhoneHasher.normalize(r.parent() == null || r.parent().isBlank() ? child : r.parent());
         if (child.length() < 10) return ResponseEntity.badRequest().body(Map.of("error", "child must be a WhatsApp number with country code"));
         LocalDate day = LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(r.days_ahead() == null ? 2 : Math.max(1, r.days_ahead()));
@@ -203,6 +225,92 @@ public class OpsController {
         }).toList());
         out.put("clock", clock());
         return ResponseEntity.ok(out);
+    }
+
+    // ---- what is running (the simulator's banner) ---------------------------------------------------------------
+
+    /** Which parts are live, replayed or absent — so the screen says plainly what a viewer is looking at. */
+    @GetMapping("/status")
+    public ResponseEntity<?> status(@RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        if (!authorized(token)) return forbidden();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("whatsapp", outbox.delivering() ? "delivering to the registered phones" : "not configured — outbox only");
+        out.put("meta_api", spark.isConfigured() ? "live (" + spark.model() + ")" : "no MODEL_API_KEY");
+        out.put("tts", tts.hasServer() ? "live (" + tts.modelId() + ")" : tts.isConfigured() ? "recorded notes only" : "no voice");
+        out.put("tape", tape.mode().name().toLowerCase() + (tape.mode() == ModelTape.Mode.OFF ? "" : " at " + tape.dir()));
+        out.put("samples", samples());
+        return ResponseEntity.ok(out);
+    }
+
+    /** Every model call so far, newest last: model id, operation, milliseconds, ok, a short note. */
+    @GetMapping("/models")
+    public ResponseEntity<?> models(@RequestHeader(value = "X-Admin-Token", required = false) String token,
+                                    @RequestParam(value = "after", defaultValue = "0") long after) {
+        if (!authorized(token)) return forbidden();
+        return ResponseEntity.ok(calls.since(after));
+    }
+
+    // ---- bundled sample inputs (her voice notes and sign photos from a recorded run) ------------------------------
+
+    /** Names of the sample inputs under the tape folder: {@code *.wav} voice notes and {@code *.jpg/*.png} sign photos. */
+    @GetMapping("/samples")
+    public ResponseEntity<?> listSamples(@RequestHeader(value = "X-Admin-Token", required = false) String token) {
+        if (!authorized(token)) return forbidden();
+        return ResponseEntity.ok(samples());
+    }
+
+    private List<String> samples() {
+        Path dir = tape.inputsDir();
+        if (!Files.isDirectory(dir)) return List.of();
+        try (var files = Files.list(dir)) {
+            return files.map(p -> p.getFileName().toString())
+                    .filter(n -> n.endsWith(".wav") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png"))
+                    .sorted().toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
+    /** Sends a bundled sample as if she had sent it: a voice note goes through transcription and the turn, a photo through the sign reader. */
+    @PostMapping("/journeys/latest/sample/{name}")
+    public ResponseEntity<?> sample(@RequestHeader(value = "X-Admin-Token", required = false) String token, @PathVariable String name) {
+        if (!authorized(token)) return forbidden();
+        if (name.contains("/") || name.contains("\\") || name.contains("..")) return ResponseEntity.badRequest().body(Map.of("error", "bad name"));
+        Path file = tape.inputsDir().resolve(name);
+        if (!Files.isRegularFile(file)) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no such sample"));
+        Optional<JourneyEntity> j = journeys.latest();
+        if (j.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no journey"));
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(file);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("sample", name);
+        try {
+            if (name.endsWith(".wav")) {
+                ParentTurnService.Reply r = parentTurns.handleAudio(j.get(), bytes, "simulator");
+                out.put("outcome", r.outcome()); out.put("intent", r.intent()); out.put("telugu", r.telugu());
+            } else {
+                String mime = name.endsWith(".png") ? "image/png" : "image/jpeg";
+                SignEvidenceService.Assessment a = signs.handleImage(j.get(), bytes, mime, "simulator");
+                out.put("verdict", a.verdict().kind().name()); out.put("english", a.verdict().english()); out.put("telugu", a.verdict().telugu());
+            }
+        } catch (RuntimeException e) {
+            out.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(out);
+        }
+        return ResponseEntity.ok(out);
+    }
+
+    /** The voice note or card behind an outbox entry, for the simulator to play or show. */
+    @GetMapping("/outbox/{seq}/media")
+    public ResponseEntity<?> outboxMedia(@RequestHeader(value = "X-Admin-Token", required = false) String token, @PathVariable long seq) {
+        if (!authorized(token)) return forbidden();
+        return outbox.media(seq)
+                .<ResponseEntity<?>>map(m -> ResponseEntity.ok().contentType(MediaType.parseMediaType(m.contentType())).body(m.bytes()))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no media for " + seq)));
     }
 
     /** Everything sent to either phone since {@code after} (outbox sequence number), by role — never by number. */

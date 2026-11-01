@@ -29,8 +29,8 @@ WhatsApp Cloud API ──webhook──► WebhookController
                  ┌─────────────────┼──────────────────┐
                  ▼                 ▼                  ▼
             JourneyRepo        TtsService         WhatsAppClient
-            (Postgres)        (MMS-TTS on Modal /
-                               Chirp 3 HD te-IN   (text / audio voice:true /
+            (Postgres)        (Seamless / MMS-TTS
+                               on Modal, Meta weights)(text / audio voice:true /
                                → OGG/Opus)         image / buttons / template)
                                    ▲
                           StageScheduler (DB-backed jobs, every 30 s)
@@ -81,7 +81,7 @@ Replies are composed from templates + verified facts, with Spark only wording th
 ## Audio pipeline
 
 Inbound: media id → download → ffmpeg `-ar 16000 -ac 1` WAV → Voice Transcribe file endpoint (or realtime ws) → transcript + confidence.
-Outbound: Telugu text → MMS-TTS `facebook/mms-tts-tel` on Modal (fallback: Chirp 3 HD `te-IN`) → ffmpeg → OGG_OPUS (mono, ~24 kbps, keep < 512 KB) → WhatsApp media upload → send `audio` with `voice: true`.
+Outbound: Telugu text → SeamlessM4T v2 or MMS-TTS (Meta open weights on Modal; no non-Meta voice is ever called) → ffmpeg → OGG_OPUS (mono, ~24 kbps, keep < 512 KB) → WhatsApp media upload → send `audio` with `voice: true`.
 
 ## Scheduling
 

@@ -10,6 +10,7 @@ import ai.concourse.journey.JourneyService;
 import ai.concourse.journey.StageEntity;
 import ai.concourse.journey.StageType;
 import ai.concourse.safety.SafetyPolicy;
+import ai.concourse.ops.ModelTape;
 import ai.concourse.spark.PromptLoader;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
@@ -77,6 +78,11 @@ public class ParentTurnService {
     /** What a turn produced: the outcome label for the log and the main Telugu line that was spoken. */
     public record Reply(String outcome, String telugu, String intent) {}
 
+    private ModelTape tape; // optional: record/replay of her inputs
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setTape(ModelTape tape) { this.tape = tape; }
+
     /** Parent sent a voice note over WhatsApp. */
     public void handleVoiceNote(String parentWaId, String mediaId) {
         long t0 = System.currentTimeMillis();
@@ -99,6 +105,7 @@ public class ParentTurnService {
     }
 
     private Reply handleAudio(JourneyEntity j, byte[] wav, String source, long t0, long t1, long t2) {
+        if (tape != null) tape.saveInput("voice", wav, "wav"); // record mode only: her note becomes a sample input
         controller.onParentMessage(j);
         JourneyFacts facts = messenger.facts(j);
         String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);
@@ -232,7 +239,8 @@ public class ParentTurnService {
             user = "transcript: " + transcript + "\njourney: {}";
         }
         SparkRequest req = new SparkRequest(prompts.prompt("parent_turn"), user, List.of(),
-                new SparkRequest.JsonSchema("parent_turn", prompts.schema("parent_turn")), 0.2);
+                new SparkRequest.JsonSchema("parent_turn", prompts.schema("parent_turn")), 0.2,
+                ModelTape.sha256(transcript)); // the recording is tied to what she said, not to the journey's dates
         return spark.completeJson(req, ParentTurn.class, mapper);
     }
 

@@ -55,6 +55,7 @@ class JourneyControllerTest {
 
     @BeforeEach
     void setUp() {
+        when(channel.isConfigured()).thenReturn(true); // a mocked WhatsApp still "delivers": the tests verify what it is sent
         clock.reset();
         journeyRepo.deleteAll(); // stages, jobs, segments and events cascade
         String suffix = String.valueOf(System.nanoTime() % 100_000_000L);

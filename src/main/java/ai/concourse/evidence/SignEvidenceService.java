@@ -8,6 +8,7 @@ import ai.concourse.journey.JourneyFacts;
 import ai.concourse.journey.JourneyService;
 import ai.concourse.journey.StageEntity;
 import ai.concourse.journey.StageType;
+import ai.concourse.ops.ModelTape;
 import ai.concourse.spark.PromptLoader;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.spark.SparkRequest;
@@ -64,6 +65,11 @@ public class SignEvidenceService {
         }
     }
 
+    private ModelTape tape; // optional: record/replay of her photos
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setTape(ModelTape tape) { this.tape = tape; }
+
     /** Parent sent a photo over WhatsApp. */
     public void handlePhoto(String parentWaId, String mediaId, String mimeType) {
         long t0 = System.currentTimeMillis();
@@ -72,23 +78,37 @@ public class SignEvidenceService {
             messenger.speak(parentWaId, TeluguPhrases.NOT_SET_UP, null, null);
             return;
         }
-        JourneyEntity j = journey.get();
-        controller.onParentMessage(j);
         byte[] image = channel.downloadMedia(mediaId);
         long t1 = System.currentTimeMillis();
-        Assessment a = assess(j, image, mimeType, "whatsapp");
-        if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) {
-            if (a.stage().showsGateCard()) messenger.sendGateCard(parentWaId, a.facts(), a.segmentSeq());
-            else messenger.sendSignCard(parentWaId, a.stage(), a.facts(), a.segmentSeq());
+        handleImage(journey.get(), image, mimeType, "whatsapp", t0, t1);
+    }
+
+    /** A photo of a sign from anywhere (WhatsApp, a bundled sample in the simulator): assess, answer, tell the child. */
+    public Assessment handleImage(JourneyEntity j, byte[] image, String mimeType, String source) {
+        long now = System.currentTimeMillis();
+        return handleImage(j, image, mimeType, source, now, now);
+    }
+
+    private Assessment handleImage(JourneyEntity j, byte[] image, String mimeType, String source, long t0, long t1) {
+        if (tape != null) tape.saveInput("sign", image, mimeType != null && mimeType.contains("png") ? "png" : "jpg"); // record mode: a photo she sent, not camera frames
+        controller.onParentMessage(j);
+        String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);
+        Assessment a = assess(j, image, mimeType, source);
+        if (parentWaId != null) {
+            if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) {
+                if (a.stage().showsGateCard()) messenger.sendGateCard(parentWaId, a.facts(), a.segmentSeq());
+                else messenger.sendSignCard(parentWaId, a.stage(), a.facts(), a.segmentSeq());
+            }
+            messenger.speak(parentWaId, a.verdict().telugu(), null, a.factsWithArrow());
+            if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) messenger.sendCameraLink(j);
         }
-        messenger.speak(parentWaId, a.verdict().telugu(), null, a.factsWithArrow());
-        if (a.verdict().kind() != EvidenceReconciler.Kind.MATCH) messenger.sendCameraLink(j);
         long t3 = System.currentTimeMillis();
-        log.info("sign turn {} ms (dl {} / spark {} / reply {}) verdict={} {}", t3 - t0, t1 - t0, a.sparkMs(), t3 - t1 - a.sparkMs(),
-                a.verdict().kind(), a.verdict().english());
+        log.info("sign turn {} ms (dl {} / spark {} / reply {}) verdict={} {} source={}", t3 - t0, t1 - t0, a.sparkMs(),
+                t3 - t1 - a.sparkMs(), a.verdict().kind(), a.verdict().english(), source);
         if (a.verdict().kind() == EvidenceReconciler.Kind.MISMATCH) {
             messenger.tellChild(j, "She photographed a sign that does not show her gate (" + a.verdict().english() + "). I told her the verified gate and to ask staff if unsure.");
         }
+        return a;
     }
 
     /**
@@ -97,10 +117,11 @@ public class SignEvidenceService {
      */
     public Assessment assess(JourneyEntity j, byte[] image, String mimeType, String source) {
         JourneyFacts facts = messenger.facts(j);
+        String mime = mimeType == null ? "image/jpeg" : mimeType.split(";")[0].strip();
         long t1 = System.currentTimeMillis();
         SignObservation seen;
         try {
-            seen = observe(image, mimeType == null ? "image/jpeg" : mimeType.split(";")[0].strip());
+            seen = observe(image, mime);
         } finally {
             java.util.Arrays.fill(image, (byte) 0); // the photo is never kept
         }
@@ -137,7 +158,8 @@ public class SignEvidenceService {
     SignObservation observe(byte[] image, String mimeType) {
         SparkRequest req = new SparkRequest(prompts.prompt("sign_observe"), "Report what is printed in this photo.",
                 List.of(new SparkRequest.Attachment(mimeType, image, "sign.jpg")),
-                new SparkRequest.JsonSchema("sign_observation", prompts.schema("sign_observe")), 0.0);
+                new SparkRequest.JsonSchema("sign_observation", prompts.schema("sign_observe")), 0.0,
+                ModelTape.sha256(image)); // the recording is tied to the photo
         return spark.completeJson(req, SignObservation.class, MAPPER);
     }
 }

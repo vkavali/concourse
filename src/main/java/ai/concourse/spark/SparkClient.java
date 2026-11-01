@@ -1,6 +1,8 @@
 package ai.concourse.spark;
 
 import ai.concourse.config.ConcourseProperties;
+import ai.concourse.ops.ModelCallLog;
+import ai.concourse.ops.ModelTape;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +24,10 @@ import reactor.netty.http.client.HttpClient;
 
 import java.time.Duration;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
@@ -49,6 +54,9 @@ public class SparkClient {
     private final String model;
     private final boolean stream;
     private final Duration timeout;
+    private final boolean configured;
+    private ModelCallLog callLog;   // optional
+    private ModelTape tape;         // optional
 
     @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public SparkClient(ConcourseProperties props, WebClient.Builder builder, ObjectMapper mapper) {
@@ -62,6 +70,7 @@ public class SparkClient {
         this.model = model;
         this.stream = stream;
         this.timeout = timeout;
+        this.configured = apiKey != null && !apiKey.isBlank();
         this.client = builder.baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .clientConnector(new ReactorClientHttpConnector(HttpClient.create().responseTimeout(timeout)))
@@ -72,8 +81,67 @@ public class SparkClient {
 
     public String model() { return model; }
 
-    /** Runs the request; one retry on 429/5xx/transport errors. */
+    public boolean isConfigured() { return configured; }
+
+    @Autowired(required = false)
+    public void setCallLog(ModelCallLog callLog) { this.callLog = callLog; }
+
+    @Autowired(required = false)
+    public void setTape(ModelTape tape) { this.tape = tape; }
+
+    /**
+     * Runs the request; one retry on 429/5xx/transport errors. With the tape replaying, a recorded answer for the
+     * same input is returned instead (and logged as a replay); with it recording, the live answer is saved.
+     */
     public SparkResponse complete(SparkRequest req) {
+        String key = tape != null && tape.mode() != ModelTape.Mode.OFF ? tapeKey(req) : null;
+        if (tape != null && tape.replaying()) {
+            Optional<String> hit = tape.lookup("spark", key);
+            if (hit.isPresent()) {
+                note(req.op(), 0, true, "replayed from tape");
+                return new SparkResponse(hit.get(), 0, 0, model + " (recording)");
+            }
+            if (!configured) {
+                note(req.op(), 0, false, "not on tape and no MODEL_API_KEY");
+                throw new SparkException(0, "no MODEL_API_KEY and no recording on the tape for this input", false);
+            }
+        }
+        long t0 = System.currentTimeMillis();
+        SparkResponse res;
+        try {
+            res = live(req);
+        } catch (SparkException e) {
+            note(req.op(), System.currentTimeMillis() - t0, false, e.getMessage());
+            throw e;
+        }
+        long ms = System.currentTimeMillis() - t0;
+        note(req.op(), ms, true, res.promptTokens() + "+" + res.completionTokens() + " tokens");
+        if (tape != null && tape.recording()) {
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("model", res.model());
+            meta.put("op", req.op());
+            meta.put("ms", ms);
+            meta.put("prompt_tokens", res.promptTokens());
+            meta.put("completion_tokens", res.completionTokens());
+            tape.save("spark", key, meta, res.content());
+        }
+        return res;
+    }
+
+    private void note(String op, long ms, boolean ok, String note) {
+        if (callLog != null) callLog.record(model, op, ms, ok, note);
+    }
+
+    /** The recording key: the caller's input hash when given, else the whole request. Never leaves the machine. */
+    String tapeKey(SparkRequest req) {
+        if (req.tapeKey() != null && !req.tapeKey().isBlank()) return ModelTape.sha256(model + "|" + req.op() + "|" + req.tapeKey());
+        ObjectNode body = buildBody(req, false);
+        body.remove("stream");
+        body.remove("stream_options");
+        return ModelTape.sha256(body.toString());
+    }
+
+    private SparkResponse live(SparkRequest req) {
         ObjectNode body = buildBody(req, stream);
         SparkException last = null;
         for (int attempt = 1; attempt <= 2; attempt++) {

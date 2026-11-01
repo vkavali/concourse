@@ -51,6 +51,11 @@ public class WhatsAppClient implements MessagingChannel {
                 .build();
     }
 
+    /** False until a token and a phone number id are set — then nothing is sent to WhatsApp (the outbox still records). */
+    public boolean isConfigured() {
+        return token != null && !token.isBlank() && phoneNumberId != null && !phoneNumberId.isBlank();
+    }
+
     @Override
     public String sendText(String to, String body) {
         return send(Map.of("messaging_product", "whatsapp", "to", to, "type", "text",

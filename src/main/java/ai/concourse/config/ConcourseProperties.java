@@ -12,6 +12,7 @@ public record ConcourseProperties(
         @DefaultValue WhatsApp whatsapp,
         @DefaultValue Meta meta,
         @DefaultValue Tts tts,
+        @DefaultValue Tape tape,
         @DefaultValue Audio audio,
         @DefaultValue Itinerary itinerary
 ) {
@@ -35,16 +36,29 @@ public record ConcourseProperties(
             @DefaultValue("120") int timeoutSeconds
     ) {}
 
-    /** Text-to-speech: facebook/mms-tts-tel on Modal (provider "mms", see modal/mms_tts.py) or Google Chirp 3 HD ("google"). */
+    /**
+     * Text-to-speech: Meta's open-weight voices served from {@code modal/} — SeamlessM4T v2 (200 speakers) or
+     * MMS-TTS Telugu — behind one HTTP contract ({@code POST /tts}, {@code GET /health}). No other voice provider
+     * exists in this codebase: every model Concourse calls at runtime is a Meta model.
+     */
     public record Tts(
             String baseUrl,
             String token,
+            /** Notes and phrases cached here; the default folder is per speaker so changing the voice never replays an old one. */
             @DefaultValue("data/tts-cache") String cacheDir,
-            @DefaultValue("mms") String provider,
-            String googleApiKey,
-            @DefaultValue("te-IN-Chirp3-HD-Aoede") String googleVoice,
-            /** SeamlessM4T vocoder speaker (0-199); ignored by MMS. */
-            @DefaultValue("0") int speaker
+            /** SeamlessM4T vocoder speaker (0-199); ignored by MMS-TTS. */
+            @DefaultValue("0") int speaker,
+            /** Label used until the server's /health reports the real model id. */
+            @DefaultValue("facebook/seamless-m4t-v2-large") String model
+    ) {}
+
+    /**
+     * The tape: {@code record} saves every model input and output of a real run under {@code dir}; {@code replay}
+     * serves those recordings so a judge without API keys sees the same run (the judge path). {@code off} otherwise.
+     */
+    public record Tape(
+            @DefaultValue("off") String mode,
+            @DefaultValue("eval/sample-run") String dir
     ) {}
 
     public record Audio(@DefaultValue("ffmpeg") String ffmpegPath) {}

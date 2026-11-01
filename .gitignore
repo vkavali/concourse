@@ -16,3 +16,6 @@ concourse-data/
 .idea/
 __pycache__/
 *.pyc
+# the recorded sample run the judge path replays: our own synthesized notes and our own test inputs — never a parent's voice
+!eval/sample-run/tts/*.ogg
+!eval/sample-run/inputs/*.wav

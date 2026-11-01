@@ -3,6 +3,8 @@ package ai.concourse.tts;
 import ai.concourse.audio.AudioTranscoder;
 import ai.concourse.audio.Wav;
 import ai.concourse.config.ConcourseProperties;
+import ai.concourse.ops.ModelCallLog;
+import ai.concourse.ops.ModelTape;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +25,6 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -32,84 +33,94 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Telugu text → OGG/Opus voice note bytes.
+ * Telugu text → OGG/Opus voice note bytes, from a Meta open-weight voice served by {@code modal/}
+ * (SeamlessM4T v2, 200 speakers, or MMS-TTS Telugu — same HTTP contract). No other voice provider exists here:
+ * every model Concourse calls at runtime is a Meta model.
  * <p>
  * The message is synthesised <b>phrase by phrase</b> ({@link Phrases}) and joined with silence we control: a long
  * beat after each sentence, a short one at commas — so a gate code sits on its own and "చూడండి, లేదా" never runs
- * together, whichever voice is behind it. Each phrase is cached, so recurring phrases cost nothing after the first use.
- * <p>
- * Providers: {@code mms} = Meta's open-source MMS-TTS (facebook/mms-tts-tel) on Modal ({@code modal/mms_tts.py});
- * {@code google} = Chirp 3 HD te-IN via the Cloud Text-to-Speech REST API — the documented fallback when the MMS
- * voice fails the intelligibility test with a real parent.
+ * together. Each phrase and each whole note is cached on disk (the folder is per speaker), so recurring phrases cost
+ * nothing after the first use and a judge replaying the tape hears the recorded notes without any TTS server.
  */
 @Component
 public class TtsClient {
     private static final Logger log = LoggerFactory.getLogger(TtsClient.class);
-    /** MMS speaks ~6 syllables/s at 1.0; 0.7 lands near 4, the pace elderly listeners follow on a phone speaker. */
+    /** The open voices speak ~6 syllables/s at 1.0; 0.7 lands near 4, the pace elderly listeners follow on a phone speaker. */
     public static final double DEFAULT_RATE = 0.7;
-    private static final int GOOGLE_SAMPLE_RATE = 24_000;
 
     private final WebClient client;
-    private final WebClient google;
     private final AudioTranscoder transcoder;
     private final Path cacheDir;
-    private final boolean configured;
-    private final String provider;      // "mms" (Modal: MMS-TTS or SeamlessM4T) or "google" (Chirp 3 HD te-IN)
-    private final String googleVoice;
+    private final boolean serverConfigured;
     private final int speaker;
+    private final String modelLabel;
+    private volatile String resolvedModel;
+    private volatile long healthRetryAt;
+    private ModelCallLog callLog;   // optional
+    private ModelTape tape;         // optional
     private final ExecutorService pool = Executors.newFixedThreadPool(4, r -> {
         Thread t = new Thread(r, "tts-phrase");
         t.setDaemon(true);
         return t;
     });
 
-    @Autowired // two constructors exist (the others are for tests); Spring needs to be told which one
+    @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public TtsClient(ConcourseProperties props, WebClient.Builder builder, AudioTranscoder transcoder) {
-        this(props.tts().baseUrl(), props.tts().token(), props.tts().cacheDir(), props.tts().provider(),
-                props.tts().googleApiKey(), props.tts().googleVoice(), props.tts().speaker(), builder, transcoder);
+        this(props.tts().baseUrl(), props.tts().token(), props.tts().cacheDir(), props.tts().speaker(), props.tts().model(),
+                builder, transcoder);
     }
 
     public TtsClient(String baseUrl, String token, String cacheDir, WebClient.Builder builder, AudioTranscoder transcoder) {
-        this(baseUrl, token, cacheDir, "mms", null, null, 0, builder, transcoder);
+        this(baseUrl, token, cacheDir, 0, null, builder, transcoder);
     }
 
-    public TtsClient(String baseUrl, String token, String cacheDir, String provider, String googleApiKey,
-                     String googleVoice, int speaker, WebClient.Builder builder, AudioTranscoder transcoder) {
-        this(baseUrl, token, cacheDir, provider, googleApiKey, googleVoice, speaker, builder, transcoder, null);
-    }
-
-    /** {@code googleBaseUrl} lets tests point the Google client at a mock server; null = the real endpoint. */
-    TtsClient(String baseUrl, String token, String cacheDir, String provider, String googleApiKey,
-              String googleVoice, int speaker, WebClient.Builder builder, AudioTranscoder transcoder, String googleBaseUrl) {
+    public TtsClient(String baseUrl, String token, String cacheDir, int speaker, String modelLabel,
+                     WebClient.Builder builder, AudioTranscoder transcoder) {
         this.transcoder = transcoder;
         this.speaker = speaker;
-        this.provider = googleApiKey != null && !googleApiKey.isBlank() && "google".equalsIgnoreCase(provider) ? "google" : "mms";
-        this.googleVoice = googleVoice == null || googleVoice.isBlank() ? "te-IN-Chirp3-HD-Aoede" : googleVoice;
-        boolean mmsConfigured = baseUrl != null && !baseUrl.isBlank();
-        this.configured = "google".equals(this.provider) || mmsConfigured;
+        this.modelLabel = modelLabel == null || modelLabel.isBlank() ? "facebook/seamless-m4t-v2-large" : modelLabel;
+        this.serverConfigured = baseUrl != null && !baseUrl.isBlank();
         ExchangeStrategies big = ExchangeStrategies.builder().codecs(c -> c.defaultCodecs().maxInMemorySize(16 * 1024 * 1024)).build();
         ReactorClientHttpConnector connector = new ReactorClientHttpConnector(HttpClient.create().responseTimeout(Duration.ofSeconds(90)));
         WebClient.Builder b = builder.clone()
-                .baseUrl(mmsConfigured ? baseUrl : "http://localhost:0")
+                .baseUrl(serverConfigured ? baseUrl : "http://localhost:0")
                 .clientConnector(connector)
                 .exchangeStrategies(big);
         if (token != null && !token.isBlank()) b.defaultHeader("X-Concourse-Token", token);
         this.client = b.build();
-        WebClient.Builder g = builder.clone()
-                .baseUrl(googleBaseUrl == null || googleBaseUrl.isBlank() ? "https://texttospeech.googleapis.com/v1" : googleBaseUrl)
-                .clientConnector(connector)
-                .exchangeStrategies(big);
-        if (googleApiKey != null && !googleApiKey.isBlank()) g.defaultHeader("X-Goog-Api-Key", googleApiKey);
-        this.google = g.build();
         this.cacheDir = cacheDir == null || cacheDir.isBlank() ? null : Path.of(cacheDir);
     }
 
+    @Autowired(required = false)
+    public void setCallLog(ModelCallLog callLog) { this.callLog = callLog; }
+
+    @Autowired(required = false)
+    public void setTape(ModelTape tape) { this.tape = tape; }
+
+    /** True when a voice can be produced: a TTS server, or recordings to replay (the cache folder or the tape). */
     public boolean isConfigured() {
-        return configured;
+        return serverConfigured
+                || (cacheDir != null && Files.isDirectory(cacheDir))
+                || (tape != null && tape.replaying() && Files.isDirectory(tape.ttsDir()));
     }
 
-    public String provider() {
-        return provider;
+    public boolean hasServer() { return serverConfigured; }
+
+    /** The model id behind the voice: what the server's {@code /health} reports, else the configured label. */
+    public String modelId() {
+        String m = resolvedModel;
+        if (m != null) return m;
+        if (!serverConfigured) return resolvedModel = modelLabel;
+        if (System.currentTimeMillis() < healthRetryAt) return modelLabel;
+        try {
+            JsonNode h = client.get().uri("/health").retrieve().bodyToMono(JsonNode.class).block(Duration.ofSeconds(8));
+            String reported = h == null ? null : h.path("model").asText(null);
+            return resolvedModel = reported == null || reported.isBlank() ? modelLabel : reported;
+        } catch (RuntimeException e) {
+            log.debug("tts /health not answering ({}); using label {}", e.getMessage(), modelLabel);
+            healthRetryAt = System.currentTimeMillis() + 60_000; // ask again in a minute, not on every note
+            return modelLabel;
+        }
     }
 
     /** OGG/Opus mono bytes ready for {@code WhatsAppClient.uploadMedia(bytes, "audio/ogg", "note.ogg")}. */
@@ -118,10 +129,21 @@ public class TtsClient {
     }
 
     public byte[] synthesizeOggOpus(String teluguText, double rate) {
-        if (!configured) throw new TtsException(0, "TTS is not configured (TTS_BASE_URL or GOOGLE_TTS_API_KEY)");
-        String key = key(provider + "|" + speaker + "|note|" + teluguText, rate);
+        String key = key("note|" + teluguText, rate);
         byte[] cached = readCache(key, ".ogg");
-        if (cached != null) return cached;
+        if (cached != null) {
+            record("note", 0, true, "cached");
+            return cached;
+        }
+        byte[] recorded = readTape(key);
+        if (recorded != null) {
+            record("note", 0, true, "replayed from tape");
+            return recorded;
+        }
+        if (!serverConfigured) {
+            record("note", 0, false, tape != null && tape.replaying() ? "not on tape and no TTS_BASE_URL" : "TTS_BASE_URL not set");
+            throw new TtsException(0, "no voice: TTS_BASE_URL is not set and this note is not in the cache or on the tape");
+        }
         long t0 = System.currentTimeMillis();
         List<Phrases.Phrase> phrases = Phrases.split(teluguText);
         byte[] audio;
@@ -129,14 +151,23 @@ public class TtsClient {
             audio = phrased(phrases, rate);
         } catch (RuntimeException e) {
             log.warn("phrase-by-phrase synthesis failed ({}); falling back to one call", e.getMessage());
-            audio = "google".equals(provider)
-                    ? googleSynthesize(teluguText, rate, "OGG_OPUS", 48_000)
-                    : mmsSynthesize(teluguText, rate, "ogg");
+            try {
+                audio = synthesize(teluguText, rate, "ogg");
+            } catch (RuntimeException e2) {
+                record("note", System.currentTimeMillis() - t0, false, e2.getMessage());
+                throw e2;
+            }
         }
-        if (audio == null || audio.length < 100) throw new TtsException(0, "empty audio");
+        if (audio == null || audio.length < 100) {
+            record("note", System.currentTimeMillis() - t0, false, "empty audio");
+            throw new TtsException(0, "empty audio");
+        }
         writeCache(key, ".ogg", audio);
-        log.info("tts ok provider={} phrases={} chars={} bytes={} ms={}", provider, phrases.size(), teluguText.length(),
-                audio.length, System.currentTimeMillis() - t0);
+        writeTape(key, audio);
+        long ms = System.currentTimeMillis() - t0;
+        record("note", ms, true, phrases.size() + " phrases, " + audio.length / 1024 + " KB");
+        log.info("tts ok model={} speaker={} phrases={} chars={} bytes={} ms={}", modelId(), speaker, phrases.size(),
+                teluguText.length(), audio.length, ms);
         return audio;
     }
 
@@ -153,20 +184,18 @@ public class TtsClient {
         return transcoder.toOggOpusVoiceNote(Wav.join(clips, pauses));
     }
 
-    /** One phrase → 16-bit mono WAV from the provider, cached on disk. */
+    /** One phrase → 16-bit mono WAV from the server, cached on disk. */
     byte[] phraseWav(String phrase, double rate) {
-        String key = key(provider + "|" + speaker + "|phrase|" + phrase, rate);
+        String key = key("phrase|" + phrase, rate);
         byte[] cached = readCache(key, ".wav");
         if (cached != null) return cached;
-        byte[] wav = "google".equals(provider)
-                ? googleSynthesize(phrase, rate, "LINEAR16", GOOGLE_SAMPLE_RATE)
-                : mmsSynthesize(phrase, rate, "wav");
+        byte[] wav = synthesize(phrase, rate, "wav");
         if (wav == null || wav.length < 44) throw new TtsException(0, "empty audio for phrase");
         writeCache(key, ".wav", wav);
         return wav;
     }
 
-    private byte[] mmsSynthesize(String text, double rate, String format) {
+    private byte[] synthesize(String text, double rate, String format) {
         try {
             return client.post().uri("/tts")
                     .contentType(MediaType.APPLICATION_JSON)
@@ -183,46 +212,14 @@ public class TtsClient {
         }
     }
 
-    /**
-     * Google Cloud Text-to-Speech, Chirp 3 HD Telugu. Chirp's rate scale differs from MMS: 0.85 here is already a
-     * calm pace, and the pauses between phrases are ours, not the voice's.
-     */
-    private byte[] googleSynthesize(String text, double rate, String encoding, int sampleRate) {
-        double googleRate = Math.round(Math.max(0.5, Math.min(1.5, rate + 0.15)) * 100) / 100.0;
-        try {
-            return googleCall(text, Map.of("audioEncoding", encoding, "speakingRate", googleRate, "sampleRateHertz", sampleRate));
-        } catch (TtsException e) {
-            if (e.status() != 400) throw e;
-            log.warn("google tts rejected the request ({}); retrying without speakingRate", e.getMessage());
-            return googleCall(text, Map.of("audioEncoding", encoding, "sampleRateHertz", sampleRate));
-        }
+    private void record(String op, long ms, boolean ok, String note) {
+        if (callLog != null) callLog.record(modelId(), "tts " + op, ms, ok, note);
     }
 
-    private byte[] googleCall(String text, Map<String, Object> audioConfig) {
-        Map<String, Object> body = Map.of(
-                "input", Map.of("text", text),
-                "voice", Map.of("languageCode", "te-IN", "name", googleVoice),
-                "audioConfig", audioConfig);
-        try {
-            JsonNode res = google.post().uri("/text:synthesize")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(body)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::isError, r -> r.bodyToMono(String.class).defaultIfEmpty("")
-                            .flatMap(b -> Mono.error(new TtsException(r.statusCode().value(), b))))
-                    .bodyToMono(JsonNode.class)
-                    .block(Duration.ofSeconds(60));
-            String b64 = res == null ? null : res.path("audioContent").asText(null);
-            if (b64 == null) throw new TtsException(0, "no audioContent in Google TTS response");
-            return Base64.getDecoder().decode(b64);
-        } catch (TtsException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            throw new TtsException(0, "google tts call failed: " + e.getMessage());
-        }
-    }
+    // ---- cache and tape ----------------------------------------------------------------------------------------
 
-    private static String key(String text, double rate) {
+    /** Content-addressed: the same text at the same rate is the same note, whichever day it was made. */
+    static String key(String text, double rate) {
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(text.strip().getBytes(StandardCharsets.UTF_8));
@@ -250,6 +247,26 @@ public class TtsClient {
             Files.write(cacheDir.resolve(key + ext), audio);
         } catch (IOException e) {
             log.debug("tts cache write skipped: {}", e.getMessage());
+        }
+    }
+
+    private byte[] readTape(String key) {
+        if (tape == null || !tape.replaying()) return null;
+        try {
+            Path p = tape.ttsDir().resolve(key + ".ogg");
+            return Files.exists(p) ? Files.readAllBytes(p) : null;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private void writeTape(String key, byte[] audio) {
+        if (tape == null || !tape.recording()) return;
+        try {
+            Files.createDirectories(tape.ttsDir());
+            Files.write(tape.ttsDir().resolve(key + ".ogg"), audio);
+        } catch (IOException e) {
+            log.warn("tape tts write failed: {}", e.getMessage());
         }
     }
 

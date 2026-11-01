@@ -46,7 +46,8 @@ public class TicketExtractor {
                 USER_TEXT,
                 List.of(new SparkRequest.Attachment(mt, bytes, filename == null ? defaultName(mt) : filename)),
                 new SparkRequest.JsonSchema("itinerary", prompts.schema("ticket_extract")),
-                0.0);
+                0.0,
+                ai.concourse.ops.ModelTape.sha256(bytes));
         Itinerary it = spark.completeJson(req, Itinerary.class, snakeCase);
         log.info("ticket extracted: isTicket={} segments={}", it.isTicket(), it.segmentsOrEmpty().size());
         return it;

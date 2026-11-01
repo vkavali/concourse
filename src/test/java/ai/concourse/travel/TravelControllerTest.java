@@ -64,6 +64,7 @@ class TravelControllerTest {
 
     @BeforeEach
     void setUp() {
+        when(whatsApp.isConfigured()).thenReturn(true); // a mocked WhatsApp still "delivers": the tests verify what it is sent
         journeyRepo.deleteAll();
         when(tts.isConfigured()).thenReturn(false);
         contacts.register(CHILD, ContactEntity.Role.CHILD, "en");

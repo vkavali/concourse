@@ -1,6 +1,8 @@
 package ai.concourse.stt;
 
 import ai.concourse.config.ConcourseProperties;
+import ai.concourse.ops.ModelCallLog;
+import ai.concourse.ops.ModelTape;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -21,6 +23,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -50,6 +53,9 @@ public class SttClient {
     private final ObjectMapper mapper;
     private final String model;
     private final Duration timeout;
+    private final boolean configured;
+    private ModelCallLog callLog;   // optional
+    private ModelTape tape;         // optional
 
     @Autowired // two constructors exist (the other is for tests); Spring needs to be told which one
     public SttClient(ConcourseProperties props, WebClient.Builder builder, ObjectMapper mapper) {
@@ -61,18 +67,76 @@ public class SttClient {
         this.mapper = mapper;
         this.model = model;
         this.timeout = timeout;
+        this.configured = apiKey != null && !apiKey.isBlank();
         this.client = builder.baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .clientConnector(new ReactorClientHttpConnector(HttpClient.create().responseTimeout(timeout)))
                 .build();
     }
 
+    public String model() { return model; }
+
+    public boolean isConfigured() { return configured; }
+
+    @Autowired(required = false)
+    public void setCallLog(ModelCallLog callLog) { this.callLog = callLog; }
+
+    @Autowired(required = false)
+    public void setTape(ModelTape tape) { this.tape = tape; }
+
     /** Transcribe a 16 kHz mono PCM WAV. Language bias is a list of language names, e.g. ["Telugu", "English"]. */
     public Transcript transcribeWav(byte[] wav, List<String> languageBias) {
         return transcribeWav(wav, languageBias, AIRPORT_KEYWORDS);
     }
 
+    /**
+     * With the tape replaying, the recording for these exact audio bytes is returned instead of a call; with it
+     * recording, the live transcript is saved under the audio's hash.
+     */
     public Transcript transcribeWav(byte[] wav, List<String> languageBias, List<String> keywords) {
+        String key = tape != null && tape.mode() != ModelTape.Mode.OFF ? ModelTape.sha256(wav) : null;
+        if (tape != null && tape.replaying()) {
+            Optional<String> hit = tape.lookup("stt", key);
+            if (hit.isPresent()) {
+                if (callLog != null) callLog.record(model, "transcribe", 0, true, "replayed from tape");
+                try {
+                    JsonNode n = mapper.readTree(hit.get());
+                    return new Transcript("tape", n.path("transcript").asText("").strip(), n.path("audioDurationMs").asLong(0));
+                } catch (IOException e) {
+                    return new Transcript("tape", hit.get().strip(), 0);
+                }
+            }
+            if (!configured) {
+                if (callLog != null) callLog.record(model, "transcribe", 0, false, "not on tape and no MODEL_API_KEY");
+                throw new SttException(0, "no MODEL_API_KEY and no recording on the tape for this audio");
+            }
+        }
+        long t0 = System.currentTimeMillis();
+        Transcript t;
+        try {
+            t = live(wav, languageBias, keywords);
+        } catch (SttException e) {
+            if (callLog != null) callLog.record(model, "transcribe", System.currentTimeMillis() - t0, false, e.getMessage());
+            throw e;
+        }
+        long ms = System.currentTimeMillis() - t0;
+        if (callLog != null) callLog.record(model, "transcribe", ms, true, t.audioDurationMs() + " ms of audio → " + t.text().length() + " chars");
+        if (tape != null && tape.recording()) {
+            try {
+                Map<String, Object> meta = new LinkedHashMap<>();
+                meta.put("model", model);
+                meta.put("op", "transcribe");
+                meta.put("ms", ms);
+                meta.put("audio_ms", t.audioDurationMs());
+                tape.save("stt", key, meta, mapper.writeValueAsString(Map.of("transcript", t.text(), "audioDurationMs", t.audioDurationMs())));
+            } catch (IOException e) {
+                log.warn("tape stt write failed: {}", e.getMessage());
+            }
+        }
+        return t;
+    }
+
+    private Transcript live(byte[] wav, List<String> languageBias, List<String> keywords) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("mode", "PUSH_TO_TALK");          // one utterance per voice note; no turn segmentation needed
         request.put("model", model);

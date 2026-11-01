@@ -36,13 +36,14 @@ concourse:
     stream: ${SPARK_STREAM:true}
     timeout-seconds: ${META_TIMEOUT_SECONDS:120}
   tts:
-    provider: ${TTS_PROVIDER:mms}
     base-url: ${TTS_BASE_URL:}
     token: ${TTS_TOKEN:}
-    cache-dir: ${TTS_CACHE_DIR:data/tts-cache}
-    google-api-key: ${GOOGLE_TTS_API_KEY:}
-    google-voice: ${GOOGLE_TTS_VOICE:te-IN-Chirp3-HD-Aoede}
+    cache-dir: ${TTS_CACHE_DIR:data/tts-cache/s${TTS_SPEAKER:0}}
     speaker: ${TTS_SPEAKER:0}
+    model: ${TTS_MODEL:facebook/seamless-m4t-v2-large}
+  tape:
+    mode: ${TAPE_MODE:off}
+    dir: ${TAPE_DIR:eval/sample-run}
   audio:
     ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
   itinerary:

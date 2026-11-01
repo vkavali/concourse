@@ -63,9 +63,8 @@ class ModelTapeTest {
         SparkClient judge = new SparkClient(server.url("/v1").toString(), "", "muse-spark-1.3", false, Duration.ofSeconds(10), WebClient.builder(), mapper);
         judge.setTape(new ModelTape("replay", dir.toString(), mapper));
         judge.setCallLog(calls);
-        SparkRequest thursday = monday.withTapeKey(ModelTape.sha256("గేట్ ఎక్కడ"));
-        thursday = new SparkRequest(thursday.system(), "transcript: గేట్ ఎక్కడ\njourney: {\"date\":\"2026-11-05\"}", thursday.attachments(),
-                thursday.schema(), thursday.temperature(), thursday.tapeKey());
+        SparkRequest thursday = new SparkRequest(monday.system(), "transcript: గేట్ ఎక్కడ\njourney: {\"date\":\"2026-11-05\"}", monday.attachments(),
+                monday.schema(), monday.temperature(), ModelTape.sha256("గేట్ ఎక్కడ"));
         SparkClient.SparkResponse replayed = judge.complete(thursday);
         assertEquals("{\"intent\":\"WHERE_IS_GATE\"}", replayed.content());
         assertEquals("muse-spark-1.3 (recording)", replayed.model());

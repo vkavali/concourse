@@ -58,6 +58,11 @@ N/N instructions understood · 0 invented directions
 - The written submission carries what the video cannot: the safety contract, the eval numbers (`eval/safety/RESULTS.md`,
   `eval/latency/RESULTS.md`), and what comes next.
 
+## Title and end cards
+`http://localhost:8080/cards.html` — five full-screen cards (← → to switch, F for full screen): the "built this week"
+opener, the one-line problem, the rule, the Meta models, and the evidence numbers (fill the placeholders from
+`eval/walkthrough/RESULTS.md` and `eval/latency/RESULTS.md`). Screen-record them for the cuts.
+
 ## Recording
 - Screen-record both phones (Android screen record; iPhone if the child uses one). Film the parent's face with consent. Capture the developer pane from the backend log viewer.
 - Keep raw clips; cut to 3:00; captions for every Telugu line; no music over voice notes.

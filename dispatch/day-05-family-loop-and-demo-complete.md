@@ -45,3 +45,18 @@ Three days left. The rubric is Impact 30 / Meta tooling 25 / Depth 20 / Demo 25;
 
 ### Nov 4 — submit by 6:00 PM CT
 - Form: team name, public repo, video link, X post, description (future plans go here, not in the video), every teammate.
+
+## Report — Sun Nov 1, evening (CI green at `39fa3fb`, 188 tests)
+- Passed: Meta-only voice (Google gone); the tape (record/replay by input hash, recordings carry their model); outbox-only
+  mode without WhatsApp; simulator with playable notes/cards, sample buttons, status banner, model-call ticker,
+  recording layout (H); Spark Open intent classifier behind `SPARK_OPEN_BASE_URL` with Spark 1.3 fallback; failure
+  paths never leave her in silence (Telugu "say it again" + buttons, her card); camera without a live model answers
+  plainly; LICENSE/NOTICE; README for judges; `docs/HACKATHON_INTEL.md`, `docs/WALKTHROUGH.md`, `docs/SUBMISSION.md`,
+  `eval/latency/summarize.py`, `cards.html` for the video.
+- Not done (needs vv's machine): Seamless deployed + speaker chosen; the tape recorded (`eval/sample-run/` is only the
+  four rendered signs so far); the two-phone run; Railway test call.
+- Blocked: nothing on the code side.
+- Tomorrow's first task (vv): deploy Seamless, `TAPE_MODE=record`, run the whole sample journey + 3 voice notes + 4
+  photos, commit the tape. Then the walkthrough with a Telugu elder (docs/WALKTHROUGH.md), filmed.
+- Tomorrow's first task (Claude): verify replay from a clean clone once the tape is pushed; fill the latency table from
+  the run; fix whatever the walkthrough shows.

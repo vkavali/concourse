@@ -16,8 +16,8 @@
   .clock { margin-left:auto; color:var(--mute); font-variant-numeric:tabular-nums; }
   #mode { color:var(--mute); font-size:12px; width:100%; }
   main { display:grid; grid-template-columns: 300px 1fr 1fr 320px; gap:12px; padding:12px 16px; min-height:calc(100vh - 52px); }
-  body.stage main { grid-template-columns: 1fr 1fr 360px; }   /* recording: the two phones and the ticker, controls hidden (press H) */
-  body.stage .panel.controls { display:none; }
+  body.recording main { grid-template-columns: 1fr 1fr 360px; }   /* recording layout: the two phones and the ticker, controls hidden (press H); 'recording' because .stage is the plan row */
+  body.recording .panel.controls { display:none; }
   @media (max-width: 1300px) { main { grid-template-columns: 300px 1fr 1fr; } .panel.ticker { grid-column: 1 / -1; } }
   @media (max-width: 1000px) { main { grid-template-columns: 1fr; } .panel.ticker { grid-column: auto; } }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; display:flex; flex-direction:column; min-height:0; }
@@ -97,7 +97,7 @@
     </div>
     <div class="row">
       <button onclick="document.body.classList.toggle('demo')">Bigger type</button>
-      <button onclick="document.body.classList.toggle('stage')" title="or press H">Hide controls (H)</button>
+      <button onclick="document.body.classList.toggle('recording')" title="or press H">Hide controls (H)</button>
     </div>
     <div class="status" id="status"></div>
     <div class="status" id="travel"></div>
@@ -244,7 +244,7 @@
       }
     } catch (e) { /* ignore */ }
   }
-  document.addEventListener('keydown', e => { if ((e.key === 'h' || e.key === 'H') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) document.body.classList.toggle('stage'); });
+  document.addEventListener('keydown', e => { if ((e.key === 'h' || e.key === 'H') && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) document.body.classList.toggle('recording'); });
   setInterval(refresh, 2000);
   setInterval(loadStatus, 10000);
   loadStatus();

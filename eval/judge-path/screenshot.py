@@ -19,7 +19,7 @@ def main(base: str, token: str, out: str) -> int:
         page.goto(f"{base}/sim.html", wait_until="domcontentloaded")
         page.fill("#token", token)
         page.dispatch_event("#token", "change")
-        page.evaluate("() => document.body.classList.add('stage')")  # recording layout: the two phones and the ticker
+        page.evaluate("() => document.body.classList.add('recording')")  # recording layout: the two phones and the ticker
         page.evaluate("() => { try { refresh(); loadStatus(); } catch (e) {} }")
         time.sleep(4)
         for feed in ("parentFeed", "childFeed", "calls"):

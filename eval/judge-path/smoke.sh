@@ -163,7 +163,7 @@ jq -r '.[] | .text' <<<"$body" | grep -q '10000000000' && fail "an outbound mess
 if [ "$TAPE_MODE" = replay ] && { ls "$TAPE_DIR"/tts/*.ogg >/dev/null 2>&1 || [ "$STRICT" = 1 ]; }; then
   [ "$VOICE" -ge 10 ] || fail "the tape has voice notes but only $VOICE were sent"
 fi
-WANTED=$(ls "$TAPE_DIR"/tts/*.txt 2>/dev/null | wc -l | tr -d ' ')
+shopt -s nullglob; wanted_files=("$TAPE_DIR"/tts/*.txt); shopt -u nullglob; WANTED=${#wanted_files[@]}
 [ "$WANTED" = 0 ] || echo "tts: $WANTED note(s) left as tts/<key>.txt for prerender_voice.py"
 echo "outbox: $PARENT to her, $CHILD to the child · $VOICE voice notes · $CARDS cards · $BUTTONS button prompts"
 

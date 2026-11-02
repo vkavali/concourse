@@ -14,7 +14,9 @@
 "My mother can fly 9,000 miles alone. The part she cannot do is read the airport after she lands."
 
 **0:10–0:30 — The child configures**
-Child's phone: forwards the real HYD→DOH→DFW ticket PDF to the Concourse number. Developer pane shows Spark's extracted itinerary JSON (flight numbers, times, terminals). Voice-over: "Her son configures the software because she can't."
+Child's phone: forwards the HYD→DOH→DFW ticket PDF to the Concourse number (in the simulator: button **1b**). The ticker
+shows the first model call — `muse-spark-1.3 · itinerary · 4.2 s` — and the child's phone gets the itinerary Spark read
+(flight numbers, times, terminal). Voice-over: "Her son configures the software because she can't."
 
 **0:30–0:55 — The parent consents and hears the first step**
 Parent's phone: she sends a voice note "start my trip." Concourse replies with a Telugu voice note — play 8 seconds unsubtitled, then subtitle: "Show your passport and ticket at the Qatar Airways counter." Card appears with the counter and a big icon.
@@ -64,6 +66,15 @@ N/N instructions understood · 0 invented directions
 `http://localhost:8080/cards.html` — five full-screen cards (← → to switch, F for full screen): the "built this week"
 opener, the one-line problem, the rule, the Meta models, and the evidence numbers (fill the placeholders from
 `eval/walkthrough/RESULTS.md` and `eval/latency/RESULTS.md`). Screen-record them for the cuts.
+
+## Subtitles
+Every Telugu line she hears is in `docs/TELUGU_SCRIPT.md` with its English meaning — paste from there; the stage texts
+are deterministic for the sample journey, so the lines in the video are exactly those.
+
+## If the phones fail (WABA locked, no network)
+The simulator **is** the phones: press H for the recording layout (traveler's phone · child's phone · model calls), "Bigger
+type" on, and film the screen; one on-screen line says "simulator — same code, no WhatsApp". Every scene above exists
+there: 1b (ticket) → 2 (consent) → 3 (stages) → ⚡ gate change → 🎤 / 📷 samples → I'm here.
 
 ## Recording
 - Screen-record both phones (Android screen record; iPhone if the child uses one). Film the parent's face with consent. Capture the developer pane from the backend log viewer.

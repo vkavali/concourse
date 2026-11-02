@@ -60,7 +60,7 @@ jobs:
       - name: Replay it and screenshot the simulator for the README
         run: |
           python3 -m pip install -q playwright && python3 -m playwright install --with-deps chromium
-          JUDGE_TAPE_MODE=replay SCREENSHOT=docs/img/simulator.png PORT=18081 OUT=build/judge-path-replay eval/judge-path/smoke.sh
+          JUDGE_TAPE_MODE=replay SCREENSHOT=docs/img/simulator.png SCREENSHOT_AT=TRANSFER_FIND_GATE PORT=18081 OUT=build/judge-path-replay eval/judge-path/smoke.sh
       - name: What is on the tape now
         run: |
           for d in spark stt sam tts inputs; do printf '%-7s %s\n' "$d" "$(ls eval/sample-run/$d 2>/dev/null | wc -l)"; done

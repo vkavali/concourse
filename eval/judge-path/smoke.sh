@@ -93,6 +93,14 @@ echo "1 · journey $JOURNEY"
 req POST /ops/journeys/latest/consent; body=$BODY; expect 200 "consent" "$body"; must_json "$body" "consent"
 echo "2 · consent"
 
+# ---- a picture of the simulator (SCREENSHOT=<png>, at SCREENSHOT_AT=<stage> or at the end) --------------------
+SHOT_TAKEN=0
+take_screenshot() {
+  mkdir -p "$(dirname "$SCREENSHOT")"
+  if python3 eval/judge-path/screenshot.py "$BASE" "$ADMIN_TOKEN" "$SCREENSHOT"; then SHOT_TAKEN=1
+  else echo "screenshot failed (pip install playwright && python3 -m playwright install --with-deps chromium)"; fi
+}
+
 # ---- her samples: voice notes and sign photos through the real path (pressed while she looks for her gate) -----
 SAMPLE_OK=0; SAMPLE_FAIL=0; SAMPLE_NOTES=""
 run_samples() {
@@ -132,6 +140,7 @@ for _ in $(seq 1 25); do
     expect 200 "gate change" "$body"; must_json "$body" "gate change"; GATE_CHANGED=1
     echo "   ⚡ gate change → D14 (simulated operations event, both phones)"
     run_samples
+    if [ -n "${SCREENSHOT:-}" ] && [ "${SCREENSHOT_AT:-}" = "$stage" ]; then take_screenshot; fi
     req POST /ops/journeys/latest/ack; body=$BODY; expect 200 "ack" "$body"
   fi
 done
@@ -195,10 +204,7 @@ if grep -qE 'Exception|ERROR' "$OUT/app.log"; then
 fi
 
 # ---- a picture of it, while the app is still up (SCREENSHOT=<png>; needs playwright + chromium) ---------------
-if [ -n "${SCREENSHOT:-}" ]; then
-  mkdir -p "$(dirname "$SCREENSHOT")"
-  python3 eval/judge-path/screenshot.py "$BASE" "$ADMIN_TOKEN" "$SCREENSHOT" || echo "screenshot failed (pip install playwright && python3 -m playwright install --with-deps chromium)"
-fi
+if [ -n "${SCREENSHOT:-}" ] && [ "$SHOT_TAKEN" = 0 ]; then take_screenshot; fi
 
 # ---- summary -------------------------------------------------------------------------------------------------
 SUMMARY="### Judge path (clean checkout, \`TAPE_MODE=$TAPE_MODE\`$([ "$TAPE_MODE" = replay ] && echo ', no keys'))

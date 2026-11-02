@@ -9,7 +9,7 @@ MMS-TTS Telugu (facebook/mms-tts-tel), using the same model, settings and ffmpeg
 deletes the .txt. A later live recording with SeamlessM4T v2 overwrites the same keys.
 
     pip install torch --index-url https://download.pytorch.org/whl/cpu
-    pip install "transformers>=4.44" scipy numpy
+    pip install "transformers>=4.44" scipy numpy uroman
     python3 eval/judge-path/prerender_voice.py [eval/sample-run] [--rate 0.7] [--dry-run]
 
 Runs on a CPU in a few seconds per note. Nothing here calls a non-Meta model.

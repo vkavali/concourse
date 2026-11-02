@@ -42,7 +42,7 @@ jobs:
           if ls eval/sample-run/tts/*.txt >/dev/null 2>&1; then
             python3 -m pip install -q --upgrade pip
             python3 -m pip install -q torch --index-url https://download.pytorch.org/whl/cpu
-            python3 -m pip install -q "transformers>=4.44" scipy numpy
+            python3 -m pip install -q "transformers>=4.44" scipy numpy uroman
             python3 eval/judge-path/prerender_voice.py eval/sample-run
           else
             echo "every note on the tape already has a voice"

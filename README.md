@@ -20,7 +20,8 @@ cp .env.example .env
 ```
 
 Open <http://localhost:8080/sim.html>, paste `judge` as the admin token, and press the buttons in order: **1** builds the
-sample HYD → DOH → DFW journey and sends her the intro; **2** is her "start my trip"; **3** fires the next stage (the
+sample HYD → DOH → DFW journey and sends her the intro (**1b** has Spark read the sample ticket PDF in `eval/tickets/`
+first — the itinerary extraction, re-dated to two days out; on the tape it replays); **2** is her "start my trip"; **3** fires the next stage (the
 journey clock jumps to it) — the Telugu voice note, the card and the buttons appear on *Traveler's phone*, the English
 update on *Child's phone*; the 🎤 / 📷 buttons send her recorded voice notes and sign photos through the real path
 (transcription → intent → templated answer; photo → sign reader → verdict); the gate-change button is the simulated

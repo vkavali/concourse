@@ -77,6 +77,7 @@
     <label>Traveler's number (blank = same phone plays both)</label>
     <input id="parent" placeholder="919876543210">
     <button class="primary" onclick="demo()">1 · New demo journey (sample HYD→DOH→DFW, dated +2 days) → intro to her</button>
+    <button onclick="demoTicket()">1b · …or let Spark read the sample ticket PDF first (re-dated +2 days)</button>
     <button onclick="act('consent')">2 · She says "start my trip"</button>
     <button onclick="act('next')">3 · Fire next stage now (clock jumps to it)</button>
     <div class="row">
@@ -141,6 +142,15 @@
       refresh();
     } catch (e) { say(e.message, true); }
   }
+  async function demoTicket() {
+    say('Spark is reading the sample ticket …');
+    try {
+      const d = await call('POST', '/ops/demo-ticket', {child: $('child').value.trim() || '10000000000', parent: $('parent').value.trim(), days_ahead: 2});
+      say('Ticket read: ' + d.traveler + ', ' + d.segments + ' flights, re-dated +' + d.redated_days + ' days — journey ' + d.journey_id.slice(0,8) + ', intro sent.');
+      lastSeq = 0; $('parentFeed').innerHTML = ''; $('childFeed').innerHTML = '';
+      refresh();
+    } catch (e) { say(e.message, true); }
+  }
   async function act(action) {
     try { const d = await call('POST', '/ops/journeys/latest/' + action); say(action + ' → ' + JSON.stringify(d)); refresh(); }
     catch (e) { say(e.message, true); }
@@ -179,8 +189,9 @@
     } catch (e) { /* no token yet */ }
   }
 
-  async function media(seq) {
-    const r = await fetch('/ops/outbox/' + seq + '/media', {headers: headers()});
+  const canOgg = !!document.createElement('audio').canPlayType('audio/ogg; codecs=opus');
+  async function media(seq, isAudio) {
+    const r = await fetch('/ops/outbox/' + seq + '/media' + (isAudio && !canOgg ? '?format=mp3' : ''), {headers: headers()});
     if (!r.ok) return null;
     return URL.createObjectURL(await r.blob());
   }
@@ -208,7 +219,7 @@
         div.innerHTML = '<div class="meta">' + new Date(e.at).toLocaleTimeString() + ' · ' + e.kind + '</div>' + body;
         feed.appendChild(div);
         if (e.mediaType) {
-          media(e.seq).then(url => {
+          media(e.seq, e.mediaType.startsWith('audio')).then(url => {
             if (!url) return;
             if (e.mediaType.startsWith('audio')) { const a = document.createElement('audio'); a.controls = true; a.src = url; div.appendChild(a); }
             else { const im = document.createElement('img'); im.className = 'card'; im.src = url; div.appendChild(im); }

@@ -115,6 +115,9 @@ class OpsControllerTest {
         mvc.perform(get("/ops/samples").header("X-Admin-Token", TOKEN)).andExpect(status().isOk());
         mvc.perform(post("/ops/journeys/latest/sample/..%2Fsecret.wav").header("X-Admin-Token", TOKEN)).andExpect(status().is4xxClientError());
         mvc.perform(post("/ops/journeys/latest/sample/nothing-here.wav").header("X-Admin-Token", TOKEN)).andExpect(status().isNotFound());
+        // the sample ticket path needs a live Spark (or its recording): without one it fails plainly, never with a stack trace
+        mvc.perform(post("/ops/demo-ticket").header("X-Admin-Token", TOKEN).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"child\":\"17165550125\"}")).andExpect(status().isBadGateway()).andExpect(jsonPath("$.error", containsString("Spark")));
 
         mvc.perform(post("/ops/demo").header("X-Admin-Token", TOKEN).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"child\":\"17165550124\"}")).andExpect(status().isOk());

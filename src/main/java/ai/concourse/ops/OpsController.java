@@ -7,7 +7,10 @@ import ai.concourse.evidence.SignEvidenceService;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.ParentTurnService;
+import ai.concourse.audio.AudioTranscoder;
 import ai.concourse.itinerary.Itinerary;
+import ai.concourse.itinerary.ItinerarySummary;
+import ai.concourse.itinerary.TicketExtractor;
 import ai.concourse.itinerary.ItineraryValidator;
 import ai.concourse.itinerary.ValidatedItinerary;
 import ai.concourse.journey.ConcourseClock;
@@ -72,11 +75,16 @@ public class OpsController {
     private final TtsClient tts;
     private final SparkClient spark;
     private final SamClient sam;
+    private final TicketExtractor extractor;
+    private final AudioTranscoder transcoder;
 
     public OpsController(ConcourseProperties props, JourneyController controller, JourneyService journeys, ConcourseClock clock,
                          ItineraryValidator validator, ContactService contacts, PhoneHasher hasher, EventRepository events,
                          OutboxChannel outbox, TravelLinks travelLinks, ModelCallLog calls, ModelTape tape,
-                         ParentTurnService parentTurns, SignEvidenceService signs, TtsClient tts, SparkClient spark, SamClient sam) {
+                         ParentTurnService parentTurns, SignEvidenceService signs, TtsClient tts, SparkClient spark, SamClient sam,
+                         TicketExtractor extractor, AudioTranscoder transcoder) {
+        this.extractor = extractor;
+        this.transcoder = transcoder;
         this.sam = sam;
         this.calls = calls;
         this.tape = tape;
@@ -163,6 +171,88 @@ public class OpsController {
         for (JourneyEntity old : journeys.abandonOthers(hasher.hash(parent), j.getId())) controller.cancelPendingJobs(old.getId(), "abandoned for demo " + j.getId());
         controller.onJourneyReady(j.getId());
         return ResponseEntity.ok(Map.of("journey_id", j.getId().toString(), "date", d, "parent_is_child", parent.equals(child)));
+    }
+
+    /**
+     * The same journey, but read from the bundled sample ticket by Spark (the first model call of the story), then
+     * re-dated so the first departure is {@code days_ahead} days away — labelled as such on both phones and in the log.
+     */
+    @PostMapping("/demo-ticket")
+    public ResponseEntity<?> demoFromTicket(@RequestHeader(value = "X-Admin-Token", required = false) String token, @RequestBody DemoRequest r) {
+        if (!authorized(token)) return forbidden();
+        String child = PhoneHasher.normalize(r.child() == null ? "" : r.child());
+        if (child.length() < 10 && !outbox.delivering()) child = "10000000000";
+        String parent = PhoneHasher.normalize(r.parent() == null || r.parent().isBlank() ? child : r.parent());
+        if (child.length() < 10) return ResponseEntity.badRequest().body(Map.of("error", "child must be a WhatsApp number with country code"));
+        Path ticket = Path.of(SAMPLE_TICKET);
+        if (!Files.isRegularFile(ticket)) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no sample ticket at " + SAMPLE_TICKET));
+        byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(ticket);
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+        }
+        int days = r.days_ahead() == null ? 2 : Math.max(1, r.days_ahead());
+        Itinerary raw;
+        try {
+            raw = extractor.extract(bytes, "application/pdf", ticket.getFileName().toString());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "Spark could not read the sample ticket: " + e.getMessage()));
+        } finally {
+            java.util.Arrays.fill(bytes, (byte) 0);
+        }
+        if (!raw.isTicket() || raw.segmentsOrEmpty().isEmpty()) return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "not read as a ticket: " + raw.reason()));
+        long shift = redateDays(raw, days);
+        Itinerary dated = redate(raw, shift);
+        ValidatedItinerary v = validator.validate(dated);
+        if (v.hasErrors()) return ResponseEntity.badRequest().body(Map.of("error", v.errors().toString()));
+        clock.reset();
+        contacts.register(child, ContactEntity.Role.CHILD, "en");
+        contacts.register(parent, ContactEntity.Role.PARENT, "te");
+        JourneyEntity j = journeys.createFromItinerary(hasher.hash(child), v);
+        journeys.confirmItinerary(j.getId(), hasher.hash(child));
+        journeys.attachParent(hasher.hash(child), hasher.hash(parent));
+        for (JourneyEntity old : journeys.abandonOthers(hasher.hash(parent), j.getId())) controller.cancelPendingJobs(old.getId(), "abandoned for demo " + j.getId());
+        outbox.sendText(child, "Ticket read by " + spark.model() + " (sample ticket, re-dated +" + shift + " days for the demo):\n" + ItinerarySummary.forChild(v));
+        controller.onJourneyReady(j.getId());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("journey_id", j.getId().toString());
+        out.put("traveler", raw.passengerFirstName());
+        out.put("segments", raw.segmentsOrEmpty().size());
+        out.put("redated_days", shift);
+        out.put("parent_is_child", parent.equals(child));
+        return ResponseEntity.ok(out);
+    }
+
+    static final String SAMPLE_TICKET = "eval/tickets/sample-itinerary-HYD-DOH-DFW.pdf";
+    private static final java.time.format.DateTimeFormatter LOCAL = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+
+    /** Days to add so the first departure lands {@code daysAhead} days from today (India time), keeping every time of day. */
+    static long redateDays(Itinerary raw, int daysAhead) {
+        try {
+            java.time.LocalDateTime first = java.time.LocalDateTime.parse(raw.segmentsOrEmpty().get(0).departureLocal(), LOCAL);
+            LocalDate target = LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(daysAhead);
+            return java.time.temporal.ChronoUnit.DAYS.between(first.toLocalDate(), target);
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    static Itinerary redate(Itinerary raw, long days) {
+        if (days == 0) return raw;
+        List<Itinerary.Segment> moved = raw.segmentsOrEmpty().stream().map(s -> new Itinerary.Segment(s.airline(), s.flightNumber(),
+                s.origin(), s.destination(), shiftLocal(s.departureLocal(), days), shiftLocal(s.arrivalLocal(), days),
+                s.terminal(), s.gate(), s.confidence(), s.notes())).toList();
+        return new Itinerary(raw.isTicket(), raw.reason(), raw.passengerFirstName(), raw.bookingReference(), moved);
+    }
+
+    private static String shiftLocal(String local, long days) {
+        if (local == null || local.isBlank()) return local;
+        try {
+            return java.time.LocalDateTime.parse(local, LOCAL).plusDays(days).format(LOCAL);
+        } catch (RuntimeException e) {
+            return local;
+        }
     }
 
     // ---- acting for her (the simulator's buttons) --------------------------------------------------------------
@@ -308,13 +398,22 @@ public class OpsController {
         return ResponseEntity.ok(out);
     }
 
-    /** The voice note or card behind an outbox entry, for the simulator to play or show. */
+    /** The voice note or card behind an outbox entry, for the simulator to play or show; {@code format=mp3} for Safari. */
     @GetMapping("/outbox/{seq}/media")
-    public ResponseEntity<?> outboxMedia(@RequestHeader(value = "X-Admin-Token", required = false) String token, @PathVariable long seq) {
+    public ResponseEntity<?> outboxMedia(@RequestHeader(value = "X-Admin-Token", required = false) String token, @PathVariable long seq,
+                                         @RequestParam(value = "format", required = false) String format) {
         if (!authorized(token)) return forbidden();
-        return outbox.media(seq)
-                .<ResponseEntity<?>>map(m -> ResponseEntity.ok().contentType(MediaType.parseMediaType(m.contentType())).body(m.bytes()))
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no media for " + seq)));
+        Optional<OutboxChannel.Media> media = outbox.media(seq);
+        if (media.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no media for " + seq));
+        OutboxChannel.Media m = media.get();
+        if ("mp3".equalsIgnoreCase(format) && m.contentType().startsWith("audio/")) {
+            try {
+                return ResponseEntity.ok().contentType(MediaType.parseMediaType("audio/mpeg")).body(transcoder.toMp3(m.bytes()));
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(Map.of("error", "cannot transcode to mp3 (is ffmpeg installed?): " + e.getMessage()));
+            }
+        }
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(m.contentType())).body(m.bytes());
     }
 
     /** Everything sent to either phone since {@code after} (outbox sequence number), by role — never by number. */

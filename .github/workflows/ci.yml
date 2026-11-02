@@ -77,3 +77,40 @@ jobs:
           name: test-report
           path: build/reports/tests/test
           if-no-files-found: ignore
+
+  judge-path:
+    # The README's five-minute path, exactly as a judge runs it: clean checkout, no keys, TAPE_MODE=replay.
+    # What both phones received and every model call are attached as the "judge-path" artifact.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install ffmpeg and jq
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg jq
+      - name: Run the judge path
+        id: judge
+        run: eval/judge-path/smoke.sh
+      - name: Upload what the judge sees
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: judge-path
+          path: build/judge-path
+          if-no-files-found: ignore
+      - name: Post failure as a commit comment
+        if: failure() && steps.judge.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "### CI failed: judge path on $GITHUB_SHA"
+            echo
+            echo '```'
+            tail -80 build/judge-path/app.log 2>/dev/null | grep -vE "^\s+at " | tail -60 || echo "(no app log)"
+            echo '```'
+          } > judge-comment.md
+          gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" -F body=@judge-comment.md >/dev/null

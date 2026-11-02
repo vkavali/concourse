@@ -28,6 +28,9 @@ update on *Child's phone*; the 🎤 / 📷 buttons send her recorded voice notes
 operations event, and *Meta model calls* on the right lists every model call as it happens — **replayed from tape**
 when no key is set, live otherwise. "Her travel screen" opens the same page she gets on WhatsApp.
 
+CI runs this exact path on every commit — a clean checkout, no keys, the buttons pressed in this order over HTTP
+(`eval/judge-path/smoke.sh`) — and attaches what both phones received and every model call as the `judge-path` artifact.
+
 With `MODEL_API_KEY` set (dev.meta.ai) the Spark and Voice Transcribe calls go live and the tape fills the gaps; with
 `TTS_BASE_URL` set (below) the voice is synthesized live. `TAPE_MODE=off` is the normal mode.
 

@@ -1,8 +1,8 @@
 {
-  "recorded_at" : "2026-11-02T18:37:49.942148495Z",
+  "recorded_at" : "2026-11-02T18:47:59.676221342Z",
   "model" : "muse-voice-transcribe-1.0",
   "op" : "transcribe",
-  "ms" : 1188,
+  "ms" : 1726,
   "audio_ms" : 3760,
-  "output" : "{\"transcript\":\"నేను దారి తప్పాను. ఏం చేయాలి?\",\"audioDurationMs\":3760}"
+  "output" : "{\"audioDurationMs\":3760,\"transcript\":\"నేను దారి తప్పాను. ఏం చేయాలి?\"}"
 }

@@ -183,9 +183,9 @@ public class OpsController {
         Itinerary raw = new Itinerary(true, "sample itinerary", "Lakshmi", "DEMO42", List.of(
                 new Itinerary.Segment("Qatar Airways", "QR4793", "HYD", "DOH", d + "T03:45", d + "T06:05", null, null, 1.0, ""),
                 new Itinerary.Segment("Qatar Airways", "QR729", "DOH", "DFW", d + "T08:40", d + "T15:50", "D", null, 1.0, "")));
+        clock.reset(); // a previous demo may have travelled the clock past these flights
         ValidatedItinerary v = validator.validate(raw);
         if (v.hasErrors()) return ResponseEntity.badRequest().body(Map.of("error", v.errors().toString()));
-        clock.reset();
         contacts.register(child, ContactEntity.Role.CHILD, "en");
         contacts.register(parent, ContactEntity.Role.PARENT, "te");
         JourneyEntity j = journeys.createFromItinerary(hasher.hash(child), v);
@@ -226,9 +226,9 @@ public class OpsController {
         if (!raw.isTicket() || raw.segmentsOrEmpty().isEmpty()) return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "not read as a ticket: " + raw.reason()));
         long shift = redateDays(raw, days);
         Itinerary dated = redate(raw, shift);
+        clock.reset(); // a previous demo may have travelled the clock past these flights
         ValidatedItinerary v = validator.validate(dated);
         if (v.hasErrors()) return ResponseEntity.badRequest().body(Map.of("error", v.errors().toString()));
-        clock.reset();
         contacts.register(child, ContactEntity.Role.CHILD, "en");
         contacts.register(parent, ContactEntity.Role.PARENT, "te");
         JourneyEntity j = journeys.createFromItinerary(hasher.hash(child), v);

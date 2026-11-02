@@ -203,8 +203,9 @@ public class ParentTurnService {
                 return new Reply("LOST".equals(intent) ? "lost" : "what_next", spoken, intent);
             }
             case "WHERE_IS_GATE" -> {
-                messenger.sendGateCard(parentWaId, facts);
-                String text = messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+                Integer seg = controller.current(j).map(StageEntity::getSegmentSeq).orElse(null);
+                messenger.sendGateCard(parentWaId, facts, seg);
+                String text = messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts, seg), null, facts);
                 messenger.sendCameraLink(j);
                 return new Reply("gate", text, intent);
             }
@@ -235,8 +236,9 @@ public class ParentTurnService {
             case StageText.BTN_HERE -> controller.markHere(j, "button");
             case BTN_GATE -> {
                 controller.onParentMessage(j);
-                messenger.sendGateCard(parentWaId, facts);
-                messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts), null, facts);
+                Integer seg = controller.current(j).map(StageEntity::getSegmentSeq).orElse(null);
+                messenger.sendGateCard(parentWaId, facts, seg);
+                messenger.speak(parentWaId, TeluguPhrases.gateAnswer(facts, seg), null, facts);
             }
             case BTN_HELP -> {
                 controller.onParentMessage(j);

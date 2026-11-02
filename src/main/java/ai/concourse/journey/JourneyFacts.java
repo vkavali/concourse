@@ -90,4 +90,10 @@ public record JourneyFacts(
     public Flight firstFlight() {
         return flights.isEmpty() ? null : flights.get(0);
     }
+
+    /** The flight a stage belongs to (by segment seq), else the first — so "where is my gate" at Doha is about the Doha flight. */
+    public Flight flight(Integer segmentSeq) {
+        if (segmentSeq == null) return firstFlight();
+        return flights.stream().filter(f -> f.seq() == segmentSeq).findFirst().orElse(firstFlight());
+    }
 }

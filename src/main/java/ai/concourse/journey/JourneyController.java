@@ -106,7 +106,7 @@ public class JourneyController {
         List<String> texts = new ArrayList<>();
         texts.add(StageText.CONSENT_THANKS);
         texts.add(StageText.ACK_THANKS);
-        texts.add(TeluguPhrases.gateAnswer(facts));
+        for (JourneyFacts.Flight f : facts.flights()) texts.add(TeluguPhrases.gateAnswer(facts, f.seq()));
         for (StageEntity s : stages.findByJourneyIdOrderBySeq(j.getId())) {
             if (s.stageType() == StageType.PRE_TRIP) continue;
             texts.add(StageText.instruction(s.stageType(), facts, s.getSegmentSeq(), s.getAirport()));

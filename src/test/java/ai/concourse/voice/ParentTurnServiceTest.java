@@ -181,6 +181,34 @@ class ParentTurnServiceTest {
     }
 
     @Test
+    void atTheTransferTheGateQuestionIsAboutTheNextFlightNotTheFirst() {
+        FlightSegmentEntity first = new FlightSegmentEntity();
+        first.setSeq(1); first.setAirline("Qatar Airways"); first.setFlightNumber("QR4793"); first.setOrigin("HYD"); first.setDestination("DOH");
+        first.setScheduledDeparture(OffsetDateTime.of(2026, 11, 28, 3, 45, 0, 0, ZoneOffset.ofHoursMinutes(5, 30)));
+        first.setLastVerifiedAt(OffsetDateTime.now()); // no gate: announced on the day
+        FlightSegmentEntity second = new FlightSegmentEntity();
+        second.setSeq(2); second.setAirline("Qatar Airways"); second.setFlightNumber("QR729"); second.setOrigin("DOH"); second.setDestination("DFW");
+        second.setScheduledDeparture(OffsetDateTime.of(2026, 11, 28, 8, 40, 0, 0, ZoneOffset.ofHours(3)));
+        second.setGate("D14"); second.setLastVerifiedAt(OffsetDateTime.now());
+        when(journeys.segments(journey.getId())).thenReturn(List.of(first, second));
+        StageEntity current = new StageEntity();
+        current.setType(StageType.TRANSFER_FIND_GATE.name());
+        current.setSegmentSeq(2);
+        current.setAirport("DOH");
+        when(controller.current(journey)).thenReturn(Optional.of(current));
+        when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "నా గేట్ ఎక్కడ", 2000));
+        sparkReturns(new ParentTurn("WHERE_IS_GATE", null, 0.95, "get_next_stage", "x", "where is my gate"));
+
+        ParentTurnService.Reply r = service.handleAudio(journey, new byte[100], "simulator");
+
+        assertTrue(r.telugu().contains("గేట్ D14"), r.telugu());
+        assertFalse(r.telugu().contains("ఇంకా చెప్పలేదు"), "not the first flight's 'not announced yet': " + r.telugu());
+        verify(channel).sendImage(eq(PARENT), any(), contains("D14"));
+        service.handleButton(PARENT, ParentTurnService.BTN_GATE);
+        verify(channel, times(2)).sendText(eq(PARENT), contains("గేట్ D14"));
+    }
+
+    @Test
     void gateQuestionsEndWithTheCameraButtonAtMostOncePerMinute() {
         service.handleButton(PARENT, ParentTurnService.BTN_GATE);
         when(stt.transcribeWav(any(), any())).thenReturn(new SttClient.Transcript("s", "గేట్ ఎక్కడ", 2000));

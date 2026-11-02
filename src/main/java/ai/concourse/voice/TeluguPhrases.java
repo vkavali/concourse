@@ -65,7 +65,12 @@ public final class TeluguPhrases {
      * "not announced yet; terminal 3; look at the big screen or show the card to staff".
      */
     public static String gateAnswer(JourneyFacts facts) {
-        JourneyFacts.Flight f = facts == null ? null : facts.firstFlight();
+        return gateAnswer(facts, null);
+    }
+
+    /** The gate of the flight her current stage is about — never the first flight by default once she is in transit. */
+    public static String gateAnswer(JourneyFacts facts, Integer segmentSeq) {
+        JourneyFacts.Flight f = facts == null ? null : facts.flight(segmentSeq);
         if (f == null) return NOT_SET_UP;
         if (f.gate() != null) {
             // The gate is said twice, slowly, the way staff repeat it; the card shows it in large print.

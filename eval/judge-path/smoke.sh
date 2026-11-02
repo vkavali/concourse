@@ -99,6 +99,9 @@ run_samples() {
   local s body
   for s in $SAMPLES; do
     req POST "/ops/journeys/latest/sample/$s"; body=$BODY; must_json "$body" "sample $s"
+    if [ "$STATUS" = 200 ] && jq -e '.intent == "ERROR" or .outcome == "retry"' >/dev/null <<<"$body"; then
+      STATUS=502; body=$(jq -c '. + {error: "transcription or intent failed; she was asked to say it again"}' <<<"$body")  # a polite failure is still not an answer
+    fi
     if [ "$STATUS" = 200 ]; then
       SAMPLE_OK=$((SAMPLE_OK + 1))
       SAMPLE_NOTES="$SAMPLE_NOTES

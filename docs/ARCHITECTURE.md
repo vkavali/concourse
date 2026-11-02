@@ -91,10 +91,28 @@ Outbound: Telugu text → SeamlessM4T v2 or MMS-TTS (Meta open weights on Modal;
 
 `POST /ops/events` (auth: admin token) with `{journey_id, type: GATE_CHANGE, segment, new_gate, source: "demo operations event"}` → `apply_verified_flight_update` → both phones notified. The video shows the source label on screen.
 
-## Optional: Travel Mode (Android, Kotlin)
+## The tape and the judge path (`ai.concourse.ops`)
 
-FCM push → high-priority heads-up notification → tap → full-screen stage card (gate, big arrow icon, audio autoplay) → buttons: SHOW STAFF / CALL MY SON. Full-screen intent only on the sideloaded demo phone. Preloads the next 3 stages for offline.
+Every model client (`SparkClient`, `SttClient`, `SamClient`, `TtsClient`) goes through `ModelTape`: with `TAPE_MODE=record`
+each live answer is saved under a content key (Spark: sha256 of the operation + the input's hash; STT: the WAV bytes; SAM:
+concept + image; TTS: spoken text + rate) in `eval/sample-run/`; with `TAPE_MODE=replay` the same key is looked up first
+and the answer is served with its original model id, logged as "replayed from tape". Nothing else changes: the same
+controller, state machine, safety policy and outbox run either way, so a judge with no keys and no WhatsApp runs the
+real code against recorded model answers. `ModelCallLog` keeps the last 200 model calls (model · operation · ms · note)
+for `/ops/models` and the simulator's ticker. `OutboxChannel` is the `MessagingChannel` when WhatsApp is not configured:
+every outbound message (text, buttons, voice note, card, link) is kept in a ring the simulator renders as two phones.
+`eval/judge-path/smoke.sh` presses the simulator's buttons over HTTP in the README's order; CI runs it on every push
+with no keys, and the `tape` workflow runs it in record mode and commits the result (Spark/SAM with a key secret; the
+voice notes synthesized with MMS-TTS Telugu when no voice server recorded them).
 
-## Optional: Simulator page (Next.js)
+## Travel Mode (web, served by the same service)
 
-Two-phone view fed by `/journeys/{id}/events` (SSE). Labeled "SIMULATOR" in the header. Never the main feature.
+`travel.html#<journey>.<token>`: the current card, the voice note, hold-to-talk, and a camera view that sends a frame
+every few seconds to the same sign reader (Spark) with SAM 3.1 outlining the board — a highlight of what the camera sees,
+never a direction. Opened from a WhatsApp link button; works on any phone browser.
+
+## Simulator (`/sim.html`)
+
+Two-phone view over `/ops/outbox` plus the model-call ticker over `/ops/models`, sample 🎤 / 📷 buttons from
+`eval/sample-run/inputs/`, the simulated operations event, and the journey clock. Labeled "SIMULATOR" in the header;
+"replayed from tape" on every recorded answer. Never the product — the console that shows it.

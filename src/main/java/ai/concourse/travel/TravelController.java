@@ -234,6 +234,7 @@ public class TravelController {
         out.put("gate_codes", a.seen().gateCodes());
         out.put("confidence", a.seen().confidence());
         out.put("stage", a.stage().name());
+        out.put("board", a.board()); // where SAM saw the sign: the screen outlines it; nothing she hears depends on it
         out.put("audio", tts.isConfigured() ? "/travel/api/" + id + "/audio/" + clipId + "?t=" + token : null);
         out.put("spark_ms", a.sparkMs());
         if (a.verdict().kind() == EvidenceReconciler.Kind.MISMATCH) {

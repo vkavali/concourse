@@ -57,13 +57,27 @@ public class SignEvidenceService {
         this.eventLog = eventLog;
     }
 
-    /** What one frame means for this journey right now. Shared by the WhatsApp photo path and Travel Mode's camera. */
+    /**
+     * What one frame means for this journey right now. Shared by the WhatsApp photo path and Travel Mode's camera.
+     * {@code board} is where SAM 3.1 saw the sign in the frame (normalised x, y, w, h) — a highlight for the screen,
+     * nothing the words depend on; null when SAM is off, failed, or found nothing.
+     */
     public record Assessment(StageType stage, Integer segmentSeq, SignObservation seen, EvidenceReconciler.Verdict verdict,
-                             JourneyFacts facts, JourneyFacts factsWithArrow, long sparkMs) {
+                             JourneyFacts facts, JourneyFacts factsWithArrow, long sparkMs, Map<String, Double> board) {
         public String safeTelugu(ai.concourse.safety.SafetyPolicy safety) {
             return safety.check(verdict.telugu(), factsWithArrow).text();
         }
     }
+
+    private SamClient sam; // optional: outlines the board she is looking at
+    private final java.util.concurrent.ExecutorService locator = java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+        Thread t = new Thread(r, "sign-locate");
+        t.setDaemon(true);
+        return t;
+    });
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setSam(SamClient sam) { this.sam = sam; }
 
     private ModelTape tape; // optional: record/replay of her photos
 
@@ -135,6 +149,9 @@ public class SignEvidenceService {
         JourneyFacts facts = messenger.facts(j);
         String mime = mimeType == null ? "image/jpeg" : mimeType.split(";")[0].strip();
         long t1 = System.currentTimeMillis();
+        // SAM looks for the board while Spark reads the words: parallel, and never on the critical path
+        java.util.concurrent.Future<Optional<SamClient.Box>> board = sam == null || !sam.isConfigured() && !(tape != null && tape.replaying())
+                ? null : locator.submit(() -> sam.locateSign(image.clone(), mime));
         SignObservation seen;
         try {
             seen = observe(image, mime);
@@ -142,6 +159,14 @@ public class SignEvidenceService {
             java.util.Arrays.fill(image, (byte) 0); // the photo is never kept
         }
         long sparkMs = System.currentTimeMillis() - t1;
+        Map<String, Double> boardBox = null;
+        if (board != null) {
+            try {
+                boardBox = board.get(Math.max(200, 4000 - sparkMs), java.util.concurrent.TimeUnit.MILLISECONDS).map(SamClient.Box::normalised).orElse(null);
+            } catch (Exception e) {
+                board.cancel(true); // late or broken: the words still go out, just without the outline
+            }
+        }
         if (seen.locationClaim() != null) {
             eventLog.record(j.getId(), EventLog.ACTOR_SYSTEM, "location_claim_dropped", Map.of("claim", String.valueOf(seen.locationClaim())));
             seen = new SignObservation(seen.isAirportSign(), seen.visibleText(), seen.gateCodes(), seen.explicitArrow(), seen.confidence(), null);
@@ -167,8 +192,9 @@ public class SignEvidenceService {
         event.put("visible_text", seen.visibleText().size() > 12 ? seen.visibleText().subList(0, 12) : seen.visibleText());
         event.put("gate_codes", seen.gateCodes());
         event.put("spark_ms", sparkMs);
+        if (boardBox != null) event.put("board", boardBox);
         eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "sign_observed", event);
-        return new Assessment(stage, segmentSeq, seen, verdict, facts, withArrow, sparkMs);
+        return new Assessment(stage, segmentSeq, seen, verdict, facts, withArrow, sparkMs, boardBox);
     }
 
     SignObservation observe(byte[] image, String mimeType) {

@@ -39,7 +39,7 @@ class SparkOpenIntentTest {
     private static ConcourseProperties props(String openBaseUrl) {
         return new ConcourseProperties("http://x", "a", "salt", null,
                 new ConcourseProperties.Meta("k", "http://meta", "muse-spark-1.3", "stt", true, 120,
-                        openBaseUrl, "open-test-key", "meta-models/muse-spark-open-1026", 1024, "low"),
+                        openBaseUrl, "open-test-key", "meta-models/muse-spark-open-1026", 1024, "low", true, "sam-3.1", "sign"),
                 null, null, null, null);
     }
 

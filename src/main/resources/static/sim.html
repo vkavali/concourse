@@ -166,7 +166,7 @@
     try {
       const s = await call('GET', '/ops/status');
       const replaying = /^replay/.test(s.tape);
-      $('mode').textContent = 'WhatsApp: ' + s.whatsapp + ' · Meta Model API: ' + s.meta_api + ' · voice: ' + s.tts + ' · tape: ' + s.tape;
+      $('mode').textContent = 'WhatsApp: ' + s.whatsapp + ' · Meta Model API: ' + s.meta_api + ' · SAM: ' + (s.sam || 'off') + ' · voice: ' + s.tts + ' · tape: ' + s.tape;
       $('simTag').textContent = replaying ? 'JUDGE PATH · REPLAYING A RECORDED RUN' : 'SIMULATOR';
       $('simTag').className = 'tag' + (replaying ? ' replay' : '');
       if (!samplesLoaded) {

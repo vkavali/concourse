@@ -44,7 +44,12 @@ public record ConcourseProperties(
             /** Reasoning tokens count against max_tokens on Spark Open: keep room for the JSON answer. */
             @DefaultValue("1024") int openMaxTokens,
             /** "low" keeps the open model's thinking short for a classification; empty = omit the field. */
-            @DefaultValue("low") String openReasoningEffort
+            @DefaultValue("low") String openReasoningEffort,
+            /** SAM 3.1 outlines the sign in her camera frame (a highlight, never a direction); off = no boxes. */
+            @DefaultValue("true") boolean samEnabled,
+            @DefaultValue("sam-3.1") String samModel,
+            /** The short noun phrase SAM is asked for. */
+            @DefaultValue("sign") String samConcept
     ) {}
 
     /**

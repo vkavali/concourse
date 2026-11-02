@@ -2,6 +2,7 @@ package ai.concourse.ops;
 
 import ai.concourse.common.PhoneHasher;
 import ai.concourse.config.ConcourseProperties;
+import ai.concourse.evidence.SamClient;
 import ai.concourse.evidence.SignEvidenceService;
 import ai.concourse.spark.SparkClient;
 import ai.concourse.tts.TtsClient;
@@ -70,11 +71,13 @@ public class OpsController {
     private final SignEvidenceService signs;
     private final TtsClient tts;
     private final SparkClient spark;
+    private final SamClient sam;
 
     public OpsController(ConcourseProperties props, JourneyController controller, JourneyService journeys, ConcourseClock clock,
                          ItineraryValidator validator, ContactService contacts, PhoneHasher hasher, EventRepository events,
                          OutboxChannel outbox, TravelLinks travelLinks, ModelCallLog calls, ModelTape tape,
-                         ParentTurnService parentTurns, SignEvidenceService signs, TtsClient tts, SparkClient spark) {
+                         ParentTurnService parentTurns, SignEvidenceService signs, TtsClient tts, SparkClient spark, SamClient sam) {
+        this.sam = sam;
         this.calls = calls;
         this.tape = tape;
         this.parentTurns = parentTurns;
@@ -236,6 +239,7 @@ public class OpsController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("whatsapp", outbox.delivering() ? "delivering to the registered phones" : "not configured — outbox only");
         out.put("meta_api", spark.isConfigured() ? "live (" + spark.model() + ")" : "no MODEL_API_KEY");
+        out.put("sam", sam.isConfigured() ? "live (" + sam.model() + ")" : "off");
         out.put("tts", tts.hasServer() ? "live (" + tts.modelId() + ")" : tts.isConfigured() ? "recorded notes only" : "no voice");
         out.put("tape", tape.mode().name().toLowerCase() + (tape.mode() == ModelTape.Mode.OFF ? "" : " at " + tape.dir()));
         out.put("samples", samples());

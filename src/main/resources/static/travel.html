@@ -30,6 +30,9 @@
   #arrow { position:absolute; top:12px; right:12px; width:120px; height:120px; display:none; filter: drop-shadow(0 2px 6px rgba(0,0,0,.6)); }
   #want { position:absolute; top:12px; left:12px; padding:8px 12px; background:rgba(255,255,255,.92); color:var(--navy); font-weight:800; font-size:28px; border-radius:10px; letter-spacing:1px; }
   #scan { position:absolute; top:50%; left:12px; right:12px; height:2px; background:rgba(255,255,255,.35); display:none; }
+  #board { position:absolute; display:none; border:4px solid rgba(255,255,255,.95); border-radius:10px; box-shadow:0 0 0 2px rgba(0,0,0,.35), 0 0 18px rgba(0,0,0,.35); pointer-events:none; transition: left .25s, top .25s, width .25s, height .25s; }
+  #board.MATCH { border-color:#2ecc71; } #board.MISMATCH { border-color:#f0b35a; }
+  #board span { position:absolute; left:-4px; top:-34px; padding:4px 10px; background:rgba(0,0,0,.7); color:#fff; font-weight:800; font-size:18px; border-radius:8px; white-space:nowrap; }
   #staff { display:none; position:fixed; inset:0; background:#fff; padding:20px; overflow:auto; z-index:5; }
   #staff pre { font: 700 22px/1.4 system-ui, sans-serif; white-space:pre-wrap; }
   .en { font: 600 16px system-ui, sans-serif; color:var(--mute); }
@@ -63,6 +66,7 @@
       <div id="want"></div>
       <svg id="arrow" viewBox="0 0 100 100"><polygon points="50,5 95,55 68,55 68,95 32,95 32,55 5,55" fill="#2ecc71" stroke="#fff" stroke-width="4"/></svg>
       <div id="scan"></div>
+      <div id="board"><span></span></div>
       <div id="banner">బోర్డు వైపు కెమెరా చూపించండి…</div>
     </div>
     <div class="en" id="seen"></div>
@@ -211,7 +215,26 @@
     }, 'image/jpeg', 0.7);
   }
 
+  let boardTimer = null;
+  // SAM 3.1 saw the sign at d.board (normalised to the frame): outline it over the live video (object-fit: cover maths)
+  function outline(d) {
+    const el = $('board'), v = $('video'), view = $('view');
+    if (!d.board || !v.videoWidth || d.kind === 'UNREADABLE' || d.kind === 'UNAVAILABLE') { el.style.display = 'none'; return; }
+    const vw = v.videoWidth, vh = v.videoHeight, W = view.clientWidth, H = view.clientHeight;
+    const scale = Math.max(W / vw, H / vh), dw = vw * scale, dh = vh * scale, ox = (W - dw) / 2, oy = (H - dh) / 2;
+    el.style.left = (ox + d.board.x * dw) + 'px';
+    el.style.top = (oy + d.board.y * dh) + 'px';
+    el.style.width = (d.board.w * dw) + 'px';
+    el.style.height = (d.board.h * dh) + 'px';
+    el.className = d.kind;
+    el.firstElementChild.textContent = d.matched || (d.gate_codes && d.gate_codes[0]) || 'బోర్డు';
+    el.style.display = 'block';
+    clearTimeout(boardTimer);
+    boardTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
+
   function show(d) {
+    outline(d);
     const b = $('banner');
     b.className = d.kind;
     b.textContent = d.telugu;

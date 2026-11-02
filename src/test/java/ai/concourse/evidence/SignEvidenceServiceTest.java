@@ -167,6 +167,28 @@ class SignEvidenceServiceTest {
     }
 
     @Test
+    void theBoardSamSawTravelsWithTheAssessmentAsAHighlightOnly() {
+        SamClient sam = mock(SamClient.class);
+        when(sam.isConfigured()).thenReturn(true);
+        when(sam.locateSign(any(), any())).thenReturn(Optional.of(new SamClient.Box(40, 30, 300, 120, 320, 334, 0.91)));
+        service.setSam(sam);
+        sparkSees(new SignObservation(true, List.of("GATES B1-B20"), List.of("B1-B20"), "left", 0.9, null));
+
+        SignEvidenceService.Assessment a = service.handleImage(journey, new byte[]{1, 2, 3}, "image/jpeg", "camera");
+
+        assertEquals(EvidenceReconciler.Kind.MATCH, a.verdict().kind());
+        assertEquals(0.125, a.board().get("x"), 1e-9);
+        assertEquals(0.91, a.board().get("c"), 1e-9);
+        verify(sam).locateSign(any(), eq("image/jpeg"));
+
+        // SAM finding nothing, or being off, changes nothing she hears
+        when(sam.locateSign(any(), any())).thenReturn(Optional.empty());
+        SignEvidenceService.Assessment b = service.handleImage(journey, new byte[]{1, 2, 3}, "image/jpeg", "camera");
+        assertNull(b.board());
+        assertEquals(a.verdict().telugu(), b.verdict().telugu());
+    }
+
+    @Test
     void unknownParentGetsNotSetUp() {
         when(journeys.latestForParent(any())).thenReturn(Optional.empty());
         service.handlePhoto("910000000000", "img1", "image/jpeg");

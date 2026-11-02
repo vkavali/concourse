@@ -40,6 +40,9 @@ concourse:
     open-model: ${SPARK_OPEN_MODEL:meta-models/muse-spark-open-1026}
     open-max-tokens: ${SPARK_OPEN_MAX_TOKENS:1024}
     open-reasoning-effort: ${SPARK_OPEN_REASONING_EFFORT:low}
+    sam-enabled: ${SAM_ENABLED:true}
+    sam-model: ${SAM_MODEL:sam-3.1}
+    sam-concept: ${SAM_CONCEPT:sign}
   tts:
     base-url: ${TTS_BASE_URL:}
     token: ${TTS_TOKEN:}

@@ -11,7 +11,7 @@ class SignatureVerifierTest {
     private final SignatureVerifier verifier = new SignatureVerifier(new ConcourseProperties(
             "http://localhost", "admin", "salt",
             new ConcourseProperties.WhatsApp("tok", "123", "verify", "secret", "http://graph"),
-            new ConcourseProperties.Meta("k", "http://meta", "spark", "stt", true, 120, null, null, null, 1024, "low"),
+            new ConcourseProperties.Meta("k", "http://meta", "spark", "stt", true, 120, null, null, null, 1024, "low", true, "sam-3.1", "sign"),
             null, null, null, null));
 
     @Test

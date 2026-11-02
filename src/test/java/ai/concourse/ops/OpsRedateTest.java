@@ -45,6 +45,14 @@ class OpsRedateTest {
     }
 
     @Test
+    void samplesAreVoiceNotesInAnyFormatAndPhotosWithTheWavFormPreferred() {
+        assertEquals(List.of("a.wav", "b.ogg", "c.M4A", "sign.jpg", "sign2.png"),
+                OpsController.pickSamples(List.of("sign2.png", "a.m4a", "a.wav", "b.ogg", "c.M4A", "sign.jpg", "notes.txt", "2026-11-02-voice.wav.tmp")));
+        assertTrue(OpsController.isAudio("note.opus"));
+        assertFalse(OpsController.isAudio("sign.jpg"));
+    }
+
+    @Test
     void unparseableDatesAreLeftAlone() {
         Itinerary odd = new Itinerary(true, "sample", "L", "X", List.of(
                 new Itinerary.Segment("A", "A1", "HYD", "DOH", "soon", null, null, null, 0.5, "")));

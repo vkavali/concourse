@@ -184,7 +184,7 @@
         samplesLoaded = true;
         if (s.samples && s.samples.length) {
           $('samples').innerHTML = '<label>Her samples from a recorded run (voice notes go through transcription + the turn; photos through the sign reader)</label>'
-            + s.samples.map(n => '<button class="sample" onclick="sample(\'' + n.replace(/'/g, '') + '\')">' + (n.endsWith('.wav') ? '🎤 ' : '📷 ') + esc(n) + '</button>').join('');
+            + s.samples.map(n => '<button class="sample" onclick="sample(\'' + n.replace(/'/g, '') + '\')">' + (/\.(wav|ogg|opus|m4a|mp3|aac)$/i.test(n) ? '🎤 ' : '📷 ') + esc(n) + '</button>').join('');
         }
       }
     } catch (e) { /* no token yet */ }

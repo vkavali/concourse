@@ -8,6 +8,7 @@ import ai.concourse.spark.SparkClient;
 import ai.concourse.tts.TtsClient;
 import ai.concourse.voice.ParentTurnService;
 import ai.concourse.audio.AudioTranscoder;
+import ai.concourse.audio.Wav;
 import ai.concourse.itinerary.Itinerary;
 import ai.concourse.itinerary.ItinerarySummary;
 import ai.concourse.itinerary.TicketExtractor;
@@ -43,8 +44,13 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -58,6 +64,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/ops")
 public class OpsController {
+    private static final Logger log = LoggerFactory.getLogger(OpsController.class);
     private final ConcourseProperties props;
     private final JourneyController controller;
     private final JourneyService journeys;
@@ -370,16 +377,64 @@ public class OpsController {
         return ResponseEntity.ok(samples());
     }
 
+    private static final List<String> AUDIO = List.of(".wav", ".ogg", ".opus", ".m4a", ".mp3", ".aac");
+
+    static boolean isAudio(String name) {
+        String n = name.toLowerCase(Locale.ROOT);
+        return AUDIO.stream().anyMatch(n::endsWith);
+    }
+
+    private static boolean isImage(String name) {
+        String n = name.toLowerCase(Locale.ROOT);
+        return n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png");
+    }
+
+    /**
+     * Voice notes in any common format plus sign photos. When a note exists both as dropped (ogg/m4a) and as the
+     * 16 kHz WAV a recording run wrote next to it, only the WAV is listed: its bytes are what the tape is keyed by.
+     */
     private List<String> samples() {
         Path dir = tape.inputsDir();
         if (!Files.isDirectory(dir)) return List.of();
         try (var files = Files.list(dir)) {
-            return files.map(p -> p.getFileName().toString())
-                    .filter(n -> n.endsWith(".wav") || n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png"))
-                    .sorted().toList();
+            return pickSamples(files.map(p -> p.getFileName().toString()).toList());
         } catch (IOException e) {
             return List.of();
         }
+    }
+
+    static List<String> pickSamples(List<String> names) {
+        List<String> all = names.stream().filter(n -> isAudio(n) || isImage(n)).sorted().toList();
+        Set<String> wavStems = all.stream().filter(n -> n.toLowerCase(Locale.ROOT).endsWith(".wav")).map(OpsController::stem).collect(Collectors.toSet());
+        return all.stream().filter(n -> n.toLowerCase(Locale.ROOT).endsWith(".wav") || !isAudio(n) || !wavStems.contains(stem(n))).toList();
+    }
+
+    private static String stem(String name) {
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    /**
+     * The 16-bit mono WAV at 16 or 24 kHz the transcriber wants. A note dropped in as ogg/m4a (or a WAV at another
+     * rate) is transcoded, and while recording the result is written next to it as {@code <stem>.wav} so the tape is
+     * keyed by bytes every machine will read identically.
+     */
+    private byte[] normalisedWav(Path file, byte[] bytes) {
+        try {
+            Wav.Pcm pcm = Wav.parse(bytes);
+            if (pcm.sampleRate() == 16000 || pcm.sampleRate() == 24000) return bytes;
+        } catch (RuntimeException notCanonical) {
+            // transcode below
+        }
+        byte[] wav = transcoder.toWav16kMono(bytes);
+        if (tape.recording()) {
+            try {
+                Files.write(file.resolveSibling(stem(file.getFileName().toString()) + ".wav"), wav);
+            } catch (IOException e) {
+                log.warn("could not keep the WAV form of {}: {}", file.getFileName(), e.getMessage());
+            }
+        }
+        return wav;
     }
 
     /** Sends a bundled sample as if she had sent it: a voice note goes through transcription and the turn, a photo through the sign reader. */
@@ -400,8 +455,8 @@ public class OpsController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("sample", name);
         try {
-            if (name.endsWith(".wav")) {
-                ParentTurnService.Reply r = parentTurns.handleAudio(j.get(), bytes, "simulator");
+            if (isAudio(name)) {
+                ParentTurnService.Reply r = parentTurns.handleAudio(j.get(), normalisedWav(file, bytes), "simulator");
                 out.put("outcome", r.outcome()); out.put("intent", r.intent()); out.put("telugu", r.telugu());
             } else {
                 String mime = name.endsWith(".png") ? "image/png" : "image/jpeg";

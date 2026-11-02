@@ -23,7 +23,9 @@ Parent's phone: she sends a voice note "start my trip." Concourse replies with a
 Timed stage fires: "Gate B12." She records a natural Telugu voice note. Developer pane: Voice Transcribe transcript + confidence → Spark tool call `get_next_stage`. Telugu voice reply.
 
 **1:25–1:55 — The killer interaction**
-She photographs a real gate sign. Developer pane:
+She photographs a real gate sign; then she opens the camera from the WhatsApp button and points it at the board — the
+screen outlines the board (SAM 3.1), shows the matched word and the arrow the board itself has, and speaks the verdict.
+Developer pane (the simulator ticker: `muse-spark-1.3 · sign_observation · 2.1 s`, `sam-3.1 · segment sign · 1.4 s`):
 ```
 { "visible_text": ["Gates B1-B18"], "explicit_arrow": "right", "location_claim": null }
 ```

@@ -26,6 +26,8 @@ reaches both phones. One tap shows a card to airport staff; one tap tells her so
   schema-constrained itinerary, classifies what she means from her transcript (intent · confidence · tool proposal),
   and reads the signs she photographs or points her camera at (`visible_text`, `gate_codes`, one `explicit_arrow`;
   `location_claim` is typed null — the model cannot say where she is).
+- **SAM 3.1** finds the sign in every photo and camera frame (concept "sign"), in parallel with Spark; the travel screen
+  outlines it with the matched word — a highlight of what the camera can see, never a route.
 - **Muse Voice Transcribe 1.0** turns her Telugu voice notes into text with a Telugu/English language bias and airport
   vocabulary.
 - **Muse Spark Open** (open weights, Baseten) classifies her intent first; Spark 1.3 answers whenever it fails.

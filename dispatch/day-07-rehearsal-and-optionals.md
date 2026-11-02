@@ -55,9 +55,11 @@ that says **CC** happens in the repo as soon as the matching **vv** step lands. 
 - [x] Reviewed the actual outbox from the CI job log: child's column was empty (one placeholder number) → two numbers; the
   travel link went out twice → once; "Hide controls (H)" layout was broken → fixed; TTS replays named the wrong model → sidecars.
 - [x] The tape recorded from CI (`tape` workflow): 22 voice notes by MMS-TTS Telugu; README screenshot from the replay.
-  **Open (vv, 1 min):** add the `MODEL_API_KEY` repository secret → re-run `tape` → Spark/SAM answers for the 4 signs and the
-  ticket land on the tape. **Open (vv, 10 min):** drop 3 voice notes into `eval/sample-run/inputs/` (any format), commit.
-- [ ] After both: `STRICT=1` in ci.yml, `eval/latency/RESULTS.md` from his live run (`eval/latency/summarize.py`).
+- [x] `MODEL_API_KEY` secret added (vv, 12:25 CT) → `tape` re-run: Spark + SAM answers for the 4 signs and the ticket, Voice
+  Transcribe + intent for 3 voice notes (MMS-TTS stand-ins until a person records them) — **103/103 model calls replay with
+  no key.** Found and fixed on the way: "where is my gate" at Doha answered about the first leg; the demo clock broke 1b.
+- [x] CI judge path is `STRICT=1`: every sample and every stage must answer from the tape, every commit.
+- [ ] `eval/latency/RESULTS.md` from vv's live run (`eval/latency/summarize.py`); note: Spark intent calls from the CI runner took 13–16 s.
 - [ ] Nov 3: video script timed against the footage; freeze.
 
 ### Decision rules (so nothing waits on a chat)

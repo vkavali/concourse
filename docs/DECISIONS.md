@@ -36,3 +36,5 @@
 - Nov 2: the tape is recorded by CI (`tape` workflow), not only on the laptop — Spark/SAM live when a `MODEL_API_KEY` secret exists; voice notes by MMS-TTS Telugu (Meta open weights) when no voice server recorded them, each note with a sidecar naming its model. Seamless from a local run overwrites the same keys.
 - Nov 2: CI runs the README's keyless judge path on every push (`eval/judge-path/smoke.sh`); what both phones received is reviewed from the job log.
 - Nov 2: the simulator uses two placeholder numbers when WhatsApp is off, so the child's phone column is never empty; the travel link is sent once (again only after ten minutes).
+- Nov 2: the 🎤 samples are MMS-TTS stand-ins (labelled) until a person records them; a short synthetic phrase transcribed badly, so the stand-ins are whole questions.
+- Nov 2: "where is my gate" answers about the flight her current stage belongs to (gateAnswer by segment), never the first leg by default.

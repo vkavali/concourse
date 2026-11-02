@@ -91,9 +91,9 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install ffmpeg and jq
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg jq
-      - name: Run the judge path
+      - name: Run the judge path (strict: every sample and every stage must answer from the tape)
         id: judge
-        run: eval/judge-path/smoke.sh
+        run: STRICT=1 eval/judge-path/smoke.sh
       - name: Upload what the judge sees
         if: always()
         uses: actions/upload-artifact@v4

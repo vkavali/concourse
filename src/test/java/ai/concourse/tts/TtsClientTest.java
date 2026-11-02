@@ -117,7 +117,7 @@ class TtsClientTest {
         assertTrue(judge.isConfigured(), "recordings count as a voice");
         assertArrayEquals(live, judge.synthesizeOggOpus("మీ విమానం. కార్డు చూడండి."));
         ModelCallLog.Entry replay = calls.since(0).get(calls.since(0).size() - 1);
-        assertEquals("replayed from tape (facebook/seamless-m4t-v2-large)", replay.note(), "the sidecar names the model that made the note");
+        assertEquals("replayed from tape", replay.note());
         assertEquals("facebook/seamless-m4t-v2-large", replay.model());
         assertEquals(java.util.Set.of("facebook/seamless-m4t-v2-large"), judge.tapeModels());
         String side = Files.readString(Files.list(tapeDir.resolve("tts")).filter(f -> f.toString().endsWith(".json")).findFirst().orElseThrow());
@@ -155,7 +155,7 @@ class TtsClientTest {
         assertEquals(7, judge.synthesizeOggOpus("కార్డు చూడండి.").length);
         ModelCallLog.Entry e = calls.since(0).get(0);
         assertEquals("facebook/mms-tts-tel", e.model(), "never the configured label for a note another model made");
-        assertEquals("replayed from tape (facebook/mms-tts-tel)", e.note());
+        assertEquals("replayed from tape", e.note());
         assertEquals(java.util.Set.of("facebook/mms-tts-tel"), judge.tapeModels());
     }
 

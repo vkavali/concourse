@@ -148,7 +148,7 @@ public class TtsClient {
         byte[] recorded = readTape(key);
         if (recorded != null) {
             String by = tapeModel(key);
-            record(by, "note", 0, true, "replayed from tape (" + by + ")");
+            record(by, "note", 0, true, "replayed from tape");
             return recorded;
         }
         if (!serverConfigured) {

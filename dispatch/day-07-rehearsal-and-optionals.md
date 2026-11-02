@@ -52,8 +52,12 @@ that says **CC** happens in the repo as soon as the matching **vv** step lands. 
 - [x] `/ops/demo-ticket` (**1b**) so the story opens with Spark reading the ticket; mp3 fallback for Safari; tests.
 - [x] `eval/judge-path/smoke.sh` + CI job: the README path runs on every commit with no keys; the outbox and model
   log are attached to the run, so what the judge sees is reviewed on every push.
-- [ ] Review the actual Telugu/English outbox from the CI artifact; fix wording.
-- [ ] After the tape lands: `STRICT=1`, clean-clone replay check, `eval/latency/RESULTS.md` from `/ops/models`.
+- [x] Reviewed the actual outbox from the CI job log: child's column was empty (one placeholder number) → two numbers; the
+  travel link went out twice → once; "Hide controls (H)" layout was broken → fixed; TTS replays named the wrong model → sidecars.
+- [x] The tape recorded from CI (`tape` workflow): 22 voice notes by MMS-TTS Telugu; README screenshot from the replay.
+  **Open (vv, 1 min):** add the `MODEL_API_KEY` repository secret → re-run `tape` → Spark/SAM answers for the 4 signs and the
+  ticket land on the tape. **Open (vv, 10 min):** drop 3 voice notes into `eval/sample-run/inputs/` (any format), commit.
+- [ ] After both: `STRICT=1` in ci.yml, `eval/latency/RESULTS.md` from his live run (`eval/latency/summarize.py`).
 - [ ] Nov 3: video script timed against the footage; freeze.
 
 ### Decision rules (so nothing waits on a chat)

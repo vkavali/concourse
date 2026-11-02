@@ -90,12 +90,50 @@ class Voice:
         return buf.getvalue()
 
 
+# Stand-in voice notes for the simulator's 🎤 buttons, until a person's own recordings replace them: the three things
+# the demo has her say, spoken by MMS-TTS at the model's normal rate, as 16 kHz mono WAV (what Voice Transcribe takes).
+STAND_IN_INPUTS = {
+    "voice-start-my-trip": "నా ప్రయాణం మొదలు.",
+    "voice-where-is-my-gate": "నా గేట్ ఎక్కడ?",
+    "voice-i-am-lost": "నేను దారి తప్పాను. ఏం చేయాలి?",
+}
+
+
+def stand_in_inputs(tape: Path, dry_run: bool) -> int:
+    inputs = tape / "inputs"
+    inputs.mkdir(parents=True, exist_ok=True)
+    have = sorted(p.name for p in inputs.iterdir() if p.name.startswith("voice-") and p.suffix.lower() in (".wav", ".ogg", ".opus", ".m4a", ".mp3", ".aac"))
+    if have:
+        print(f"voice samples already present, nothing synthesized: {' '.join(have)}")
+        return 0
+    print(f"{len(STAND_IN_INPUTS)} stand-in voice note(s) with {MODEL_ID}:")
+    for name, text in STAND_IN_INPUTS.items():
+        print(f"  {name}.wav  {text}")
+    if dry_run:
+        return 0
+    voice = Voice(1.0)
+    for name, text in STAND_IN_INPUTS.items():
+        wav = voice.wav(text)
+        (inputs / f"{name}.wav").write_bytes(wav)
+        print(f"  {name}.wav  {len(wav) // 1024} KB")
+    (inputs / "voice-samples-PROVENANCE.md").write_text(
+        "The `voice-*.wav` files here were synthesized with Meta's MMS-TTS Telugu (`facebook/mms-tts-tel`) by\n"
+        "`eval/judge-path/prerender_voice.py --inputs` as stand-ins: they say what the demo has her say, so the 🎤 path\n"
+        "(Voice Transcribe → intent → answer) runs on a judge's laptop. They are not a person's voice. Drop real recordings\n"
+        "(any format) into this folder and delete these; the next recording run keys the tape by the real audio.\n",
+        encoding="utf-8")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("tape", nargs="?", default="eval/sample-run")
     ap.add_argument("--rate", type=float, default=0.7, help="speaking rate the app keyed the notes with (TtsClient.DEFAULT_RATE)")
     ap.add_argument("--dry-run", action="store_true", help="list the notes, synthesize nothing")
+    ap.add_argument("--inputs", action="store_true", help="instead: synthesize the stand-in voice notes for the 🎤 samples (only when none exist)")
     args = ap.parse_args()
+    if args.inputs:
+        return stand_in_inputs(Path(args.tape), args.dry_run)
     tts = Path(args.tape) / "tts"
     wanted = sorted(p for p in tts.glob("*.txt") if not p.with_suffix(".ogg").exists())
     stale = sorted(p for p in tts.glob("*.txt") if p.with_suffix(".ogg").exists())

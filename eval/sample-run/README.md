@@ -12,7 +12,7 @@ Spark and SAM answers when the repository has a `MODEL_API_KEY` secret, and a vo
 | `stt/<key>.json` | Muse Voice Transcribe 1.0 transcripts, keyed by the audio bytes' hash | recorded from live calls |
 | `tts/<key>.json` | the sidecar of each note: which model made it, when, how long it took, from the live server or the prerender pass — what the ticker reports on replay | written with the note |
 | `tts/<key>.ogg` | the Telugu voice notes Concourse synthesized, keyed by spoken text — SeamlessM4T v2 on Modal when recorded from a live run; until then MMS-TTS Telugu (`facebook/mms-tts-tel`) synthesized by the `tape` workflow in CI (`eval/judge-path/prerender_voice.py`) from the exact texts the app wanted to speak | our own synthesized audio, Meta open weights either way |
-| `inputs/*.wav` | her sample voice notes, as sent through the simulator's 🎤 buttons | recorded by the builder's own voice, with consent — never a parent's note |
+| `inputs/voice-*.wav` | the sample voice notes behind the simulator's 🎤 buttons | a person's own recording when one has been made (the builder's voice, with consent — never a parent's note); until then **stand-ins synthesized by MMS-TTS** that say the three phrases, so the Voice Transcribe → intent → answer path runs on a judge's laptop (`inputs/voice-samples-PROVENANCE.md` says which) |
 | `inputs/sign-*.jpg` | sample airport signs for the 📷 buttons | **rendered, not photographed**: `GATES B1 – B20 ←`, `GATES C1 – C30 →`, `BAGGAGE CLAIM →`, `TRANSFER FLIGHTS ←` |
 
 Nothing here contains a phone number, a name beyond the sample itinerary's "Lakshmi", a ticket, or a transcript of a

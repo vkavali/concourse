@@ -11,6 +11,10 @@ on:
         description: "Synthesize the notes no voice server spoke, with MMS-TTS Telugu (Meta open weights)"
         type: boolean
         default: true
+      stand_in_inputs:
+        description: "If no voice-note samples exist yet, synthesize the three stand-ins for the 🎤 buttons (MMS-TTS)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -29,6 +33,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Install ffmpeg, jq and a Telugu font (for the screenshot)
         run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg jq fonts-noto-core
+      - name: Python deps for MMS-TTS (Meta open weights)
+        if: ${{ inputs.voice || inputs.stand_in_inputs }}
+        run: |
+          python3 -m pip install -q --upgrade pip
+          python3 -m pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+          python3 -m pip install -q "transformers>=4.44" scipy numpy uroman
+      - name: Stand-in voice notes for the 🎤 samples (only when none exist)
+        if: ${{ inputs.stand_in_inputs }}
+        run: python3 eval/judge-path/prerender_voice.py --inputs eval/sample-run
       - name: Record the judge path (TAPE_MODE=record)
         env:
           JUDGE_TAPE_MODE: record
@@ -40,9 +53,6 @@ jobs:
         if: ${{ inputs.voice }}
         run: |
           if ls eval/sample-run/tts/*.txt >/dev/null 2>&1; then
-            python3 -m pip install -q --upgrade pip
-            python3 -m pip install -q torch --index-url https://download.pytorch.org/whl/cpu
-            python3 -m pip install -q "transformers>=4.44" scipy numpy uroman
             python3 eval/judge-path/prerender_voice.py eval/sample-run
           else
             echo "every note on the tape already has a voice"

@@ -122,6 +122,21 @@ class TtsClientTest {
     }
 
     @Test
+    void recordingWithoutAServerLeavesTheSpokenTextForALaterSynthesisPass() throws Exception {
+        TtsClient none = new TtsClient("", null, null, 7, "facebook/mms-tts-tel", WebClient.builder(), noFfmpeg);
+        none.setTape(new ModelTape("record", tapeDir.toString(), new ObjectMapper()));
+        assertThrows(TtsClient.TtsException.class, () -> none.synthesizeOggOpus("మీ గేట్ డి పద్నాలుగు."));
+        String key = TtsClient.key("note|మీ గేట్ డి పద్నాలుగు.", TtsClient.DEFAULT_RATE);
+        Path wanted = tapeDir.resolve("tts").resolve(key + ".txt");
+        assertEquals("మీ గేట్ డి పద్నాలుగు.\n", Files.readString(wanted));
+        // replaying never writes anything into the judge's checkout
+        TtsClient judge = new TtsClient("", null, null, 7, "facebook/mms-tts-tel", WebClient.builder(), noFfmpeg);
+        judge.setTape(new ModelTape("replay", tapeDir.toString(), new ObjectMapper()));
+        assertThrows(TtsClient.TtsException.class, () -> judge.synthesizeOggOpus("ఇంకో వాక్యం."));
+        assertEquals(1, Files.list(tapeDir.resolve("tts")).count());
+    }
+
+    @Test
     void withoutAServerOrRecordingsThereIsNoVoice() {
         TtsClient none = new TtsClient("", null, null, WebClient.builder(), noFfmpeg);
         assertFalse(none.isConfigured());

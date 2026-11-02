@@ -98,10 +98,15 @@ public class TtsClient {
     public void setTape(ModelTape tape) { this.tape = tape; }
 
     /** True when a voice can be produced: a TTS server, or recordings to replay (the cache folder or the tape). */
+    /**
+     * Whether asking for a voice can produce one: a server, a cache of earlier notes, a tape with recorded notes —
+     * or a recording session, where a note with no server still leaves its text for a later synthesis pass.
+     */
     public boolean isConfigured() {
         return serverConfigured
                 || (cacheDir != null && Files.isDirectory(cacheDir))
-                || (tape != null && tape.replaying() && Files.isDirectory(tape.ttsDir()));
+                || (tape != null && tape.replaying() && Files.isDirectory(tape.ttsDir()))
+                || (tape != null && tape.recording());
     }
 
     public boolean hasServer() { return serverConfigured; }
@@ -146,6 +151,7 @@ public class TtsClient {
             return recorded;
         }
         if (!serverConfigured) {
+            wanted(key, teluguText);
             record("note", 0, false, tape != null && tape.replaying() ? "not on tape and no TTS_BASE_URL" : "TTS_BASE_URL not set");
             throw new TtsException(0, "no voice: TTS_BASE_URL is not set and this note is not in the cache or on the tape");
         }
@@ -265,11 +271,27 @@ public class TtsClient {
         }
     }
 
+    /**
+     * Recording with no voice server: leave the note's spoken text at {@code tts/<key>.txt} so a later pass
+     * ({@code eval/judge-path/prerender_voice.py}, Meta's MMS-TTS Telugu) can synthesize exactly this text under
+     * exactly this key. Replaced by the live recording the moment a server synthesizes the same note.
+     */
+    private void wanted(String key, String spokenText) {
+        if (tape == null || !tape.recording()) return;
+        try {
+            Files.createDirectories(tape.ttsDir());
+            Files.writeString(tape.ttsDir().resolve(key + ".txt"), spokenText.strip() + "\n", StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.debug("tts wanted-note not written: {}", e.getMessage());
+        }
+    }
+
     private void writeTape(String key, byte[] audio) {
         if (tape == null || !tape.recording()) return;
         try {
             Files.createDirectories(tape.ttsDir());
             Files.write(tape.ttsDir().resolve(key + ".ogg"), audio);
+            Files.deleteIfExists(tape.ttsDir().resolve(key + ".txt"));
         } catch (IOException e) {
             log.warn("tape tts write failed: {}", e.getMessage());
         }

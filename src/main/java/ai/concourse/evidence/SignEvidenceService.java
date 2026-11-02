@@ -104,7 +104,7 @@ public class SignEvidenceService {
     }
 
     private Assessment handleImage(JourneyEntity j, byte[] image, String mimeType, String source, long t0, long t1) {
-        if (tape != null) tape.saveInput("sign", image, mimeType != null && mimeType.contains("png") ? "png" : "jpg"); // record mode: a photo she sent, not camera frames
+        if (tape != null && !"simulator".equals(source)) tape.saveInput("sign", image, mimeType != null && mimeType.contains("png") ? "png" : "jpg"); // record mode: a photo she sent (a sample is already in the folder)
         controller.onParentMessage(j);
         String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);
         Assessment a;

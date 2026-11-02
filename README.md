@@ -30,6 +30,8 @@ when no key is set, live otherwise. "Her travel screen" opens the same page she 
 
 CI runs this exact path on every commit — a clean checkout, no keys, the buttons pressed in this order over HTTP
 (`eval/judge-path/smoke.sh`) — and attaches what both phones received and every model call as the `judge-path` artifact.
+The tape itself can be (re)recorded from CI: Actions → **tape** → Run (Spark / SAM answers with a `MODEL_API_KEY`
+secret; the voice notes synthesized with Meta's MMS-TTS Telugu when no voice server recorded them).
 
 With `MODEL_API_KEY` set (dev.meta.ai) the Spark and Voice Transcribe calls go live and the tape fills the gaps; with
 `TTS_BASE_URL` set (below) the voice is synthesized live. `TAPE_MODE=off` is the normal mode.

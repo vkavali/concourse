@@ -4,8 +4,11 @@
 # anything that is not a plain JSON answer. Counts what the judge would see (stages fired, voice notes, cards,
 # model calls replayed) and writes it to build/judge-path/ — and to the GitHub job summary when there is one.
 #
-#   eval/judge-path/smoke.sh            # lenient: a missing recording is reported, not fatal
-#   STRICT=1 eval/judge-path/smoke.sh   # the tape must answer every sample and every stage must have a voice note
+#   eval/judge-path/smoke.sh                        # lenient: a missing recording is reported, not fatal
+#   STRICT=1 eval/judge-path/smoke.sh               # the tape must answer every sample and every stage must have a voice note
+#   JUDGE_TAPE_MODE=record eval/judge-path/smoke.sh # the same run with TAPE_MODE=record: keys stay set, answers are
+#                                                   # written to the tape, notes with no voice server leave tts/<key>.txt
+#                                                   # for eval/judge-path/prerender_voice.py (see .github/workflows/tape.yml)
 #
 # Needs: Java 21, curl, jq. ffmpeg only for ?format=mp3.
 set -euo pipefail
@@ -19,11 +22,13 @@ BASE="http://localhost:$PORT"
 mkdir -p "$OUT"
 
 export ADMIN_TOKEN="${ADMIN_TOKEN:-judge}"
-export TAPE_MODE=replay
+export TAPE_MODE="${JUDGE_TAPE_MODE:-replay}"
 export TAPE_DIR="${TAPE_DIR:-eval/sample-run}"
 export SERVER_PORT="$PORT"
 export DATABASE_URL="${DATABASE_URL:-jdbc:h2:file:$ROOT/$OUT/db;MODE=PostgreSQL}"
-unset MODEL_API_KEY WHATSAPP_TOKEN WHATSAPP_PHONE_NUMBER_ID TTS_BASE_URL SPARK_OPEN_BASE_URL SPARK_OPEN_API_KEY 2>/dev/null || true
+export TTS_CACHE_DIR="$ROOT/$OUT/tts-cache"
+unset WHATSAPP_TOKEN WHATSAPP_PHONE_NUMBER_ID 2>/dev/null || true
+if [ "$TAPE_MODE" = replay ]; then unset MODEL_API_KEY TTS_BASE_URL SPARK_OPEN_BASE_URL SPARK_OPEN_API_KEY 2>/dev/null || true; fi
 
 fail() { echo "FAIL: $*" >&2; echo "--- last 60 lines of the app log ---" >&2; tail -60 "$OUT/app.log" >&2 || true; exit 1; }
 
@@ -33,7 +38,7 @@ if [ -z "${JAR:-}" ]; then
   JAR="$(ls build/libs/*.jar | grep -v -- '-plain.jar' | head -1)"
 fi
 [ -f "$JAR" ] || fail "no jar at $JAR"
-echo "booting $JAR on :$PORT (TAPE_MODE=replay, no keys)"
+echo "booting $JAR on :$PORT (TAPE_MODE=$TAPE_MODE$([ "$TAPE_MODE" = replay ] && echo ', no keys' || echo ", MODEL_API_KEY $([ -n "${MODEL_API_KEY:-}" ] && echo set || echo unset)"))"
 java -jar "$JAR" > "$OUT/app.log" 2>&1 &
 APP=$!
 trap 'kill $APP 2>/dev/null || true; wait $APP 2>/dev/null || true; rm -f "$TMP"' EXIT
@@ -71,8 +76,10 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/ops/status")
 # ---- status: replaying, keyless ------------------------------------------------------------------------------
 req GET /ops/status; body=$BODY; expect 200 "status" "$body"; must_json "$body" "status"
 echo "$body" > "$OUT/status.json"
-grep -q '"tape" *: *"replay' <<<"$body" || fail "status does not say the tape is replaying: $body"
-grep -q 'no MODEL_API_KEY' <<<"$body" || fail "status says a key is set — the judge path must run without one: $body"
+grep -q "\"tape\" *: *\"$TAPE_MODE" <<<"$body" || fail "status does not say the tape is in $TAPE_MODE mode: $body"
+if [ "$TAPE_MODE" = replay ]; then
+  grep -q 'no MODEL_API_KEY' <<<"$body" || fail "status says a key is set — the judge path must run without one: $body"
+fi
 SAMPLES=$(jq -r '.samples[]' <<<"$body")
 echo "status: $(jq -c 'del(.samples)' <<<"$body")"
 echo "samples: $(tr '\n' ' ' <<<"$SAMPLES")"
@@ -153,9 +160,11 @@ UNKNOWN=$(jq '[.[] | select(.role=="unknown")] | length' <<<"$body")
 [ "$UNKNOWN" = 0 ] || fail "$UNKNOWN messages went to an unknown role"
 jq -r '.[] | .text' <<<"$body" | grep -qiE 'exception|stacktrace|NullPointer' && fail "an outbound message contains an exception text"
 jq -r '.[] | .text' <<<"$body" | grep -q '10000000000' && fail "an outbound message contains the phone number"
-if ls "$TAPE_DIR"/tts/*.ogg >/dev/null 2>&1 || [ "$STRICT" = 1 ]; then
+if [ "$TAPE_MODE" = replay ] && { ls "$TAPE_DIR"/tts/*.ogg >/dev/null 2>&1 || [ "$STRICT" = 1 ]; }; then
   [ "$VOICE" -ge 10 ] || fail "the tape has voice notes but only $VOICE were sent"
 fi
+WANTED=$(ls "$TAPE_DIR"/tts/*.txt 2>/dev/null | wc -l | tr -d ' ')
+[ "$WANTED" = 0 ] || echo "tts: $WANTED note(s) left as tts/<key>.txt for prerender_voice.py"
 echo "outbox: $PARENT to her, $CHILD to the child · $VOICE voice notes · $CARDS cards · $BUTTONS button prompts"
 
 # ---- every model call, labelled -------------------------------------------------------------------------------
@@ -183,7 +192,7 @@ if grep -qE 'Exception|ERROR' "$OUT/app.log"; then
 fi
 
 # ---- summary -------------------------------------------------------------------------------------------------
-SUMMARY="### Judge path (clean checkout, no keys, \`TAPE_MODE=replay\`)
+SUMMARY="### Judge path (clean checkout, \`TAPE_MODE=$TAPE_MODE\`$([ "$TAPE_MODE" = replay ] && echo ', no keys'))
 
 | | |
 |---|---|
@@ -193,7 +202,7 @@ SUMMARY="### Judge path (clean checkout, no keys, \`TAPE_MODE=replay\`)
 | samples answered from the tape | $SAMPLE_OK of $((SAMPLE_OK + SAMPLE_FAIL)) |
 | sample ticket read (1b) | $TICKET |
 | model calls logged / replayed | $CALLS / $REPLAYED |
-| mode | $([ "$STRICT" = 1 ] && echo strict || echo lenient) |
+| mode | TAPE_MODE=$TAPE_MODE · $([ "$STRICT" = 1 ] && echo strict || echo lenient)$([ "$WANTED" = 0 ] || echo " · $WANTED notes awaiting synthesis") |
 
 | sample | | |
 |---|---|---|$SAMPLE_NOTES

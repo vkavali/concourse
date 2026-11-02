@@ -1,0 +1,66 @@
+name: tape
+# Records the judge path onto the tape from CI, so the keyless demo has real answers and a voice without anyone's laptop:
+# the README's five-minute path runs with TAPE_MODE=record; Spark / SAM answers are recorded live when the MODEL_API_KEY
+# secret is set; every note no voice server spoke is then synthesized with Meta's open-weight MMS-TTS Telugu
+# (facebook/mms-tts-tel) under the same content key; the result is committed to eval/sample-run/.
+# A later local recording (Seamless on Modal, her voice notes for the 🎤 samples) overwrites the same keys.
+on:
+  workflow_dispatch:
+    inputs:
+      voice:
+        description: "Synthesize the notes no voice server spoke, with MMS-TTS Telugu (Meta open weights)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency: tape
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install ffmpeg and jq
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg jq
+      - name: Record the judge path (TAPE_MODE=record)
+        env:
+          JUDGE_TAPE_MODE: record
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          TTS_BASE_URL: ${{ secrets.TTS_BASE_URL }}
+          TTS_TOKEN: ${{ secrets.TTS_TOKEN }}
+        run: eval/judge-path/smoke.sh
+      - name: Voice for the notes no server spoke (MMS-TTS Telugu, Meta open weights)
+        if: ${{ inputs.voice }}
+        run: |
+          if ls eval/sample-run/tts/*.txt >/dev/null 2>&1; then
+            python3 -m pip install -q --upgrade pip
+            python3 -m pip install -q torch --index-url https://download.pytorch.org/whl/cpu
+            python3 -m pip install -q "transformers>=4.44" scipy numpy
+            python3 eval/judge-path/prerender_voice.py eval/sample-run
+          else
+            echo "every note on the tape already has a voice"
+          fi
+      - name: What is on the tape now
+        run: |
+          for d in spark stt sam tts inputs; do printf '%-7s %s\n' "$d" "$(ls eval/sample-run/$d 2>/dev/null | wc -l)"; done
+          du -sh eval/sample-run
+      - name: Commit the tape
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A eval/sample-run
+          if git diff --cached --quiet; then echo "tape unchanged"; exit 0; fi
+          key_note="no MODEL_API_KEY secret: model answers not recorded"
+          [ -n "${{ secrets.MODEL_API_KEY }}" ] && key_note="Spark / SAM answers recorded from live Meta Model API calls"
+          voice_note="voice notes synthesized by MMS-TTS Telugu (facebook/mms-tts-tel) in CI"
+          [ -n "${{ secrets.TTS_BASE_URL }}" ] && voice_note="voice notes recorded from the TTS server"
+          git commit -q -m "eval: tape recorded by CI — $key_note; $voice_note" \
+                        -m "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git push

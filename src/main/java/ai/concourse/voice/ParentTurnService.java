@@ -114,7 +114,7 @@ public class ParentTurnService {
     }
 
     private Reply handleAudio(JourneyEntity j, byte[] wav, String source, long t0, long t1, long t2) {
-        if (tape != null) tape.saveInput("voice", wav, "wav"); // record mode only: her note becomes a sample input
+        if (tape != null && !"simulator".equals(source)) tape.saveInput("voice", wav, "wav"); // record mode only: her note becomes a sample input (a sample already is one)
         controller.onParentMessage(j);
         JourneyFacts facts = messenger.facts(j);
         String parentWaId = messenger.parentOf(j).map(c -> c.getE164()).orElse(null);

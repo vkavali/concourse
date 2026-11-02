@@ -107,7 +107,7 @@ class TtsClientTest {
         client.setCallLog(calls);
         for (int i = 0; i < 2; i++) server.enqueue(wav(100));
         byte[] live = client.synthesizeOggOpus("మీ విమానం. కార్డు చూడండి.");
-        assertEquals(1, Files.list(tapeDir.resolve("tts")).count(), "the whole note is copied to the tape");
+        assertEquals(2, Files.list(tapeDir.resolve("tts")).count(), "the whole note is copied to the tape, with its sidecar");
         assertTrue(calls.since(0).get(0).model().startsWith("facebook/"), "the call log names the Meta model");
 
         // a judge: no TTS_BASE_URL, no cache, only the tape

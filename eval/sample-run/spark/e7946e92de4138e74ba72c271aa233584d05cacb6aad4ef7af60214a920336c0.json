@@ -1,9 +1,9 @@
 {
-  "recorded_at" : "2026-11-02T18:47:57.856173945Z",
+  "recorded_at" : "2026-11-02T19:08:51.760062081Z",
   "model" : "muse-spark-1.3",
   "op" : "sign_observation",
-  "ms" : 4293,
+  "ms" : 4707,
   "prompt_tokens" : 1911,
-  "completion_tokens" : 896,
+  "completion_tokens" : 917,
   "output" : "{\"confidence\":1.0,\"explicit_arrow\":\"left\",\"gate_codes\":[],\"is_airport_sign\":true,\"location_claim\":null,\"visible_text\":[\"TRANSFER FLIGHTS\",\"INTERNATIONAL CONNECTIONS\"]}"
 }

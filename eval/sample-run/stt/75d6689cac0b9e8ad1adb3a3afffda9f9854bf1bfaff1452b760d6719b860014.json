@@ -1,8 +1,8 @@
 {
-  "recorded_at" : "2026-11-02T18:48:22.780423724Z",
+  "recorded_at" : "2026-11-02T19:09:16.169830805Z",
   "model" : "muse-voice-transcribe-1.0",
   "op" : "transcribe",
-  "ms" : 1372,
+  "ms" : 1222,
   "audio_ms" : 4080,
-  "output" : "{\"audioDurationMs\":4080,\"transcript\":\"నా gate ఎక్కడ ఉంది? నేను gate కి వెళ్లాలి.\"}"
+  "output" : "{\"audioDurationMs\":4080,\"transcript\":\"నానా gate ఎక్కడ ఉంది? నేను gate వెళ్లాలి.\"}"
 }

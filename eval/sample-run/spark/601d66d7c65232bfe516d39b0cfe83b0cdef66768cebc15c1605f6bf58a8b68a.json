@@ -1,9 +1,9 @@
 {
-  "recorded_at" : "2026-11-02T18:48:09.183152396Z",
+  "recorded_at" : "2026-11-02T19:09:02.459754720Z",
   "model" : "muse-spark-1.3",
   "op" : "parent_turn",
-  "ms" : 9501,
+  "ms" : 9355,
   "prompt_tokens" : 1303,
-  "completion_tokens" : 2375,
-  "output" : "{\"confidence\": 0.95, \"english_gloss\": \"She says she lost her way and asks what to do.\", \"entity\": null, \"intent\": \"LOST\", \"reply_te\": \"\\u0c15\\u0c02\\u0c17\\u0c3e\\u0c30\\u0c41 \\u0c2a\\u0c21\\u0c15\\u0c2e\\u0c4d\\u0c2e\\u0c3e, \\u0c2e\\u0c40 \\u0c2b\\u0c4d\\u0c32\\u0c48\\u0c1f\\u0c4d QR4793 \\u0c17\\u0c47\\u0c1f\\u0c4d \\u0c07\\u0c02\\u0c15\\u0c3e \\u0c1a\\u0c46\\u0c2a\\u0c4d\\u0c2a\\u0c32\\u0c47\\u0c26\\u0c41. \\u0c26\\u0c17\\u0c4d\\u0c17\\u0c30\\u0c32\\u0c4b \\u0c09\\u0c28\\u0c4d\\u0c28 \\u0c35\\u0c3e\\u0c33\\u0c4d\\u0c32\\u0c15\\u0c3f \\u0c08 \\u0c15\\u0c3e\\u0c30\\u0c4d\\u0c21\\u0c41 \\u0c1a\\u0c42\\u0c2a\\u0c3f\\u0c02\\u0c1a\\u0c02\\u0c21\\u0c3f.\", \"tool_proposal\": \"create_staff_card\"}"
+  "completion_tokens" : 2452,
+  "output" : "{\"confidence\": 0.95, \"english_gloss\": \"She says she lost her way and asks what to do\", \"entity\": null, \"intent\": \"LOST\", \"reply_te\": \"\\u0c15\\u0c02\\u0c17\\u0c3e\\u0c30\\u0c41 \\u0c2a\\u0c21\\u0c15\\u0c02\\u0c21\\u0c3f \\u0c05\\u0c2e\\u0c4d\\u0c2e\\u0c3e, \\u0c28\\u0c47\\u0c28\\u0c41 \\u0c09\\u0c28\\u0c4d\\u0c28\\u0c3e\\u0c28\\u0c41. \\u0c2e\\u0c40 \\u0c2b\\u0c4d\\u0c32\\u0c48\\u0c1f\\u0c4d QR4793, \\u0c17\\u0c47\\u0c1f\\u0c4d \\u0c07\\u0c02\\u0c15\\u0c3e \\u0c1a\\u0c46\\u0c2a\\u0c4d\\u0c2a\\u0c32\\u0c47\\u0c26\\u0c41, \\u0c08 \\u0c15\\u0c3e\\u0c30\\u0c4d\\u0c21\\u0c41 \\u0c05\\u0c15\\u0c4d\\u0c15\\u0c21\\u0c3f \\u0c35\\u0c3e\\u0c33\\u0c4d\\u0c32\\u0c15\\u0c3f \\u0c1a\\u0c42\\u0c2a\\u0c3f\\u0c02\\u0c1a\\u0c02\\u0c21\\u0c3f.\", \"tool_proposal\": \"create_staff_card\"}"
 }

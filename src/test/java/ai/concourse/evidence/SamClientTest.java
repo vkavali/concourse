@@ -68,7 +68,7 @@ class SamClientTest {
         SamClient.Box b = SamClient.best(SamClient.parse(FRAME)).orElseThrow();
         assertEquals(40, b.x1());
         assertEquals(0.125, b.normalised().get("x"), 1e-9);   // 40 / 320
-        assertEquals(0.8125, b.normalised().get("w"), 1e-9);  // 260 / 320
+        assertEquals(0.813, b.normalised().get("w"), 1e-9);   // 260 / 320, three decimals
         assertEquals(0.91, b.normalised().get("c"), 1e-9);
         assertTrue(SamClient.best(List.of()).isEmpty());
         // without confidences, the largest box

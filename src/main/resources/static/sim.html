@@ -147,7 +147,7 @@
     say('Spark is reading the sample ticket …');
     try {
       const d = await call('POST', '/ops/demo-ticket', {child: $('child').value.trim() || '10000000000', parent: $('parent').value.trim(), days_ahead: 2});
-      say('Ticket read: ' + d.traveler + ', ' + d.segments + ' flights, re-dated +' + d.redated_days + ' days — journey ' + d.journey_id.slice(0,8) + ', intro sent.');
+      say('Ticket read: ' + d.traveler + ', ' + d.segments + ' flights, first departure moved to ' + d.first_departure + ' — journey ' + d.journey_id.slice(0,8) + ', intro sent.');
       lastSeq = 0; $('parentFeed').innerHTML = ''; $('childFeed').innerHTML = '';
       refresh();
     } catch (e) { say(e.message, true); }

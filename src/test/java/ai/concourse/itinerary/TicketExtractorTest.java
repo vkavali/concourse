@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -81,5 +82,14 @@ class TicketExtractorTest {
         assertFalse(extractor.supports("audio/ogg; codecs=opus"));
         assertFalse(extractor.supports(null));
         assertThrows(IllegalArgumentException.class, () -> extractor.extract(new byte[1], "text/plain", "x.txt"));
+    }
+
+    @Test
+    void aNamePrintedInCapitalsIsGreetedInTitleCase() {
+        Itinerary caps = new Itinerary(true, "e-ticket", "LAKSHMI", "DEMO42", List.of());
+        assertEquals("Lakshmi", TicketExtractor.withSpokenName(caps).passengerFirstName());
+        assertEquals("Lakshmi Devi", TicketExtractor.withSpokenName(new Itinerary(true, "", "LAKSHMI DEVI", null, List.of())).passengerFirstName());
+        assertEquals("McArthur", TicketExtractor.withSpokenName(new Itinerary(true, "", "McArthur", null, List.of())).passengerFirstName(), "mixed case is left as printed");
+        assertNull(TicketExtractor.withSpokenName(new Itinerary(false, "not a ticket", null, null, null)).passengerFirstName());
     }
 }

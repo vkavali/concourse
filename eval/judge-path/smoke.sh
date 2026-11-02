@@ -143,7 +143,7 @@ if [ "$STRICT" = 1 ] && [ "$SAMPLE_FAIL" -gt 0 ]; then fail "$SAMPLE_FAIL sample
 
 # ---- 1b · Spark reads the sample ticket (on tape or plainly not) ----------------------------------------------
 req POST /ops/demo-ticket '{"child":"10000000000","days_ahead":2}'; body=$BODY; must_json "$body" "demo-ticket"
-if [ "$STATUS" = 200 ]; then TICKET="ok — $(jq -r '"\(.traveler), \(.segments) flights, re-dated +\(.redated_days) days"' <<<"$body")"
+if [ "$STATUS" = 200 ]; then TICKET="ok — $(jq -r '"\(.traveler), \(.segments) flights, first departure moved to \(.first_departure)"' <<<"$body")"
 else [ "$STATUS" = 502 ] || fail "demo-ticket: HTTP $STATUS: $body"; TICKET="not on tape — $(jq -r .error <<<"$body" | cut -c1-120)"
   [ "$STRICT" = 1 ] && fail "the ticket extraction is not on the tape"; fi
 echo "1b · ticket: $TICKET"

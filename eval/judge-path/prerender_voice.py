@@ -94,25 +94,27 @@ class Voice:
 # the demo has her say, spoken by MMS-TTS at the model's normal rate, as 16 kHz mono WAV (what Voice Transcribe takes).
 STAND_IN_INPUTS = {
     "voice-start-my-trip": "నా ప్రయాణం మొదలు.",
-    "voice-where-is-my-gate": "నా గేట్ ఎక్కడ?",
+    "voice-where-is-my-gate": "నా గేట్ ఎక్కడ ఉంది? నేను ఎటు వెళ్ళాలి?",   # a whole question: short synthetic phrases transcribe poorly
     "voice-i-am-lost": "నేను దారి తప్పాను. ఏం చేయాలి?",
 }
+AUDIO = (".wav", ".ogg", ".opus", ".m4a", ".mp3", ".aac")
 
 
 def stand_in_inputs(tape: Path, dry_run: bool) -> int:
     inputs = tape / "inputs"
     inputs.mkdir(parents=True, exist_ok=True)
-    have = sorted(p.name for p in inputs.iterdir() if p.name.startswith("voice-") and p.suffix.lower() in (".wav", ".ogg", ".opus", ".m4a", ".mp3", ".aac"))
-    if have:
-        print(f"voice samples already present, nothing synthesized: {' '.join(have)}")
+    present = {p.stem for p in inputs.iterdir() if p.suffix.lower() in AUDIO}
+    missing = {name: text for name, text in STAND_IN_INPUTS.items() if name not in present}
+    if not missing:
+        print(f"voice samples already present, nothing synthesized: {' '.join(sorted(present))}")
         return 0
-    print(f"{len(STAND_IN_INPUTS)} stand-in voice note(s) with {MODEL_ID}:")
-    for name, text in STAND_IN_INPUTS.items():
+    print(f"{len(missing)} stand-in voice note(s) with {MODEL_ID}:")
+    for name, text in missing.items():
         print(f"  {name}.wav  {text}")
     if dry_run:
         return 0
     voice = Voice(1.0)
-    for name, text in STAND_IN_INPUTS.items():
+    for name, text in missing.items():
         wav = voice.wav(text)
         (inputs / f"{name}.wav").write_bytes(wav)
         print(f"  {name}.wav  {len(wav) // 1024} KB")

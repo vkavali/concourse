@@ -1,9 +1,0 @@
-{
-  "recorded_at" : "2026-11-02T18:38:23.746282401Z",
-  "model" : "muse-spark-1.3",
-  "op" : "parent_turn",
-  "ms" : 13792,
-  "prompt_tokens" : 1291,
-  "completion_tokens" : 3702,
-  "output" : "{\"confidence\": 0.6, \"english_gloss\": \"She is asking about her Qatar gate.\", \"entity\": \"Qatar\", \"intent\": \"WHERE_IS_GATE\", \"reply_te\": \"అమ్మా, మీ ఫ్లైట్ QR4793 గేట్ ఇంకా చెప్పలేదు. బోర్డు చూస్తూ ఉండండి, ఏం చేయాలో చెబుతాను.\", \"tool_proposal\": \"get_next_stage\"}"
-}

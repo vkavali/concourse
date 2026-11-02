@@ -49,8 +49,22 @@ public class TicketExtractor {
                 0.0,
                 ai.concourse.ops.ModelTape.sha256(bytes));
         Itinerary it = spark.completeJson(req, Itinerary.class, snakeCase);
+        it = withSpokenName(it);
         log.info("ticket extracted: isTicket={} segments={}", it.isTicket(), it.segmentsOrEmpty().size());
         return it;
+    }
+
+    /** Tickets print names in capitals ("LAKSHMI"); she is greeted as "Lakshmi". Mixed-case names are left as printed. */
+    static Itinerary withSpokenName(Itinerary it) {
+        String n = it.passengerFirstName();
+        if (n == null || n.isBlank() || !n.equals(n.toUpperCase(Locale.ROOT)) || n.length() < 2) return it;
+        StringBuilder sb = new StringBuilder();
+        boolean start = true;
+        for (char c : n.toLowerCase(Locale.ROOT).toCharArray()) {
+            sb.append(start ? Character.toUpperCase(c) : c);
+            start = !Character.isLetter(c);
+        }
+        return new Itinerary(it.isTicket(), it.reason(), sb.toString(), it.bookingReference(), it.segments());
     }
 
     private static String normalize(String mimeType) {

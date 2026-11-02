@@ -1,8 +1,0 @@
-{
-  "recorded_at" : "2026-11-02T18:38:09.953913499Z",
-  "model" : "muse-voice-transcribe-1.0",
-  "op" : "transcribe",
-  "ms" : 598,
-  "audio_ms" : 1760,
-  "output" : "{\"transcript\":\"Nagate Qatar.\",\"audioDurationMs\":1760}"
-}

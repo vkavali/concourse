@@ -235,13 +235,16 @@ public class OpsController {
         journeys.confirmItinerary(j.getId(), hasher.hash(child));
         journeys.attachParent(hasher.hash(child), hasher.hash(parent));
         for (JourneyEntity old : journeys.abandonOthers(hasher.hash(parent), j.getId())) controller.cancelPendingJobs(old.getId(), "abandoned for demo " + j.getId());
-        outbox.sendText(child, "Ticket read by " + spark.model() + " (sample ticket, re-dated +" + shift + " days for the demo):\n" + ItinerarySummary.forChild(v));
+        String firstDeparture = dated.segmentsOrEmpty().get(0).departureLocal();
+        outbox.sendText(child, "Ticket read by " + spark.model() + " (sample ticket; the demo re-dates it so the first flight leaves on "
+                + (firstDeparture.length() >= 10 ? firstDeparture.substring(0, 10) : firstDeparture) + "):\n" + ItinerarySummary.forChild(v));
         controller.onJourneyReady(j.getId());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("journey_id", j.getId().toString());
         out.put("traveler", raw.passengerFirstName());
         out.put("segments", raw.segmentsOrEmpty().size());
         out.put("redated_days", shift);
+        out.put("first_departure", firstDeparture);
         out.put("parent_is_child", parent.equals(child));
         return ResponseEntity.ok(out);
     }

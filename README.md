@@ -73,7 +73,7 @@ the model id next to every call.
 | Classify what she means (gate? help? son? start my trip?) | **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights) first when `SPARK_OPEN_BASE_URL` is set, **Muse Spark 1.3** otherwise and whenever the open model fails | intent + confidence + tool proposal; code decides and answers from verified facts | Baseten partner inference / Meta Model API |
 | Read the board she photographs, or points the camera at | **Muse Spark 1.3** (vision) | `visible_text`, `gate_codes`, one `explicit_arrow`; `location_claim` is typed null | Meta Model API |
 | Outline the board in her camera | **SAM 3.1** (`sam-3.1`) | asked for "sign" on each frame, in parallel with Spark; the travel screen draws the box with the matched word — a highlight, never a direction | Meta Model API |
-| Speak Telugu | **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, CC-BY-NC 4.0) or **MMS-TTS Telugu** (`facebook/mms-tts-tel`, CC-BY-NC 4.0) — Meta open weights | text → speech phrase by phrase, pauses engineered in code, Opus voice notes | our Modal deployment (`modal/`) |
+| Speak Telugu | **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, CC-BY-NC 4.0) or **MMS-TTS Telugu** (`facebook/mms-tts-tel`, CC-BY-NC 4.0) — Meta open weights | text → speech phrase by phrase, pauses engineered in code, Opus voice notes | our Modal deployment (`modal/`); the notes on the tape were synthesized by MMS-TTS in CI (`eval/judge-path/prerender_voice.py`) and each carries a sidecar naming its model |
 
 What is deliberately **not** a model: the journey state machine, the stage timing, the safety check on every outbound
 message, and the cards (drawn in code from verified facts). The sentence we are judged by: *Spark interprets the human;

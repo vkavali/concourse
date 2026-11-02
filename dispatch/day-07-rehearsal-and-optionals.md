@@ -25,10 +25,10 @@ Code is ahead of the evidence. Everything below that says **vv** needs the lapto
 that says **CC** happens in the repo as soon as the matching **vv** step lands. Order matters — each step feeds the next.
 
 ### vv — in this order (≈ 4 h wall clock)
-1. **Voice (30 min).** `modal deploy modal/seamless_tts.py` → `TTS_BASE_URL=<printed URL>`. Audition: `curl -X POST
-   $TTS_BASE_URL/tts -H 'content-type: application/json' -d '{"text":"నమస్తే అమ్మ. మీ గేట్ డి పద్నాలుగు.","speaker":N}'
-   --output s$N.ogg` for N in 0 5 12 20 33 47 61 88 104 150 → pick the softest, set `TTS_SPEAKER=N`. If Modal fights
-   you for more than 30 min: `modal deploy modal/mms_tts.py` instead (one voice, no speaker choice) and move on.
+1. **Voice (30 min).** `modal deploy modal/seamless_tts.py` → `TTS_BASE_URL=<printed URL>` (+ `TTS_TOKEN` if you set
+   one). Audition without the app: `for n in 0 5 12 20 33 47 61 88 104 150; do modal run modal/seamless_tts.py
+   --speaker $n --out s$n.ogg; done` → play them, pick the softest, set `TTS_SPEAKER=N`. If Modal fights you for more
+   than 30 min: `modal deploy modal/mms_tts.py` instead (one voice, no speaker choice) and move on.
 2. **Record the tape (45 min).** `.env`: `TAPE_MODE=record`, `MODEL_API_KEY`, `TTS_BASE_URL`, `TTS_SPEAKER`, WhatsApp
    off is fine (the outbox is the phone). `./gradlew bootRun`, open `/sim.html`, then: **1b** (Spark reads the ticket) →
    **2** → **3** through every stage (ack each gate card) → gate change at TRANSFER_FIND_GATE → the four 📷 samples →

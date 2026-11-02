@@ -19,6 +19,8 @@ cp .env.example .env
 ./gradlew bootRun
 ```
 
+![The simulator after a replayed run: her phone with the Telugu voice notes and cards, the child's phone, and every Meta model call](docs/img/simulator.png)
+
 Open <http://localhost:8080/sim.html>, paste `judge` as the admin token, and press the buttons in order: **1** builds the
 sample HYD → DOH → DFW journey and sends her the intro (**1b** has Spark read the sample ticket PDF in `eval/tickets/`
 first — the itinerary extraction, re-dated to two days out; on the tape it replays); **2** is her "start my trip"; **3** fires the next stage (the

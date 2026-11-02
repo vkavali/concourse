@@ -47,6 +47,10 @@ jobs:
           else
             echo "every note on the tape already has a voice"
           fi
+      - name: Replay it and screenshot the simulator for the README
+        run: |
+          python3 -m pip install -q playwright && python3 -m playwright install --with-deps chromium
+          JUDGE_TAPE_MODE=replay SCREENSHOT=docs/img/simulator.png PORT=18081 OUT=build/judge-path-replay eval/judge-path/smoke.sh
       - name: What is on the tape now
         run: |
           for d in spark stt sam tts inputs; do printf '%-7s %s\n' "$d" "$(ls eval/sample-run/$d 2>/dev/null | wc -l)"; done
@@ -55,7 +59,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A eval/sample-run
+          git add -A eval/sample-run docs/img
           if git diff --cached --quiet; then echo "tape unchanged"; exit 0; fi
           key_note="no MODEL_API_KEY secret: model answers not recorded"
           [ -n "${{ secrets.MODEL_API_KEY }}" ] && key_note="Spark / SAM answers recorded from live Meta Model API calls"

@@ -191,6 +191,12 @@ if grep -qE 'Exception|ERROR' "$OUT/app.log"; then
   grep -E 'ERROR|Exception' "$OUT/app.log" | grep -v 'no MODEL_API_KEY\|not on tape\|no voice\|SparkException\|TtsException' | head -20 || true
 fi
 
+# ---- a picture of it, while the app is still up (SCREENSHOT=<png>; needs playwright + chromium) ---------------
+if [ -n "${SCREENSHOT:-}" ]; then
+  mkdir -p "$(dirname "$SCREENSHOT")"
+  python3 eval/judge-path/screenshot.py "$BASE" "$ADMIN_TOKEN" "$SCREENSHOT" || echo "screenshot failed (pip install playwright && python3 -m playwright install --with-deps chromium)"
+fi
+
 # ---- summary -------------------------------------------------------------------------------------------------
 SUMMARY="### Judge path (clean checkout, \`TAPE_MODE=$TAPE_MODE\`$([ "$TAPE_MODE" = replay ] && echo ', no keys'))
 

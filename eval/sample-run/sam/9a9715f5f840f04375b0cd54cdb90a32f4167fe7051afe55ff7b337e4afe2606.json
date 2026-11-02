@@ -1,0 +1,8 @@
+{
+  "recorded_at" : "2026-11-02T18:37:28.793735572Z",
+  "model" : "sam-3.1",
+  "op" : "segment",
+  "ms" : 2883,
+  "boxes" : 1,
+  "output" : "<0f>0<|box;x1=87;y1=140;x2=1192;y2=580;w=1280;h=720;c=0.7928802371025085|><|mask;x=0;y=0;c=0.7928802371025085;data=408,1024,!!!!#UGO@?dV+oYK=kors#rRXsKJkC_4D{7o%-rh$+`tHN_!niduc[ARCMEe=04I%`?wsfH779jmFiLUlu*KkTjDUkKsqW)Cxwh'6&0UrTx1CCevj-U:c3[kWl)iUI?Gq!i7:H6z`S+)N9[W9#a2M7kZ0dlK&QNsZtJ2kSojHk.|>\n"
+}

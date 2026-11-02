@@ -1,0 +1,8 @@
+{
+  "recorded_at": "2026-11-02T18:39:10+00:00",
+  "model": "facebook/mms-tts-tel",
+  "op": "note",
+  "ms": 6013,
+  "rate": 0.7,
+  "source": "eval/judge-path/prerender_voice.py (CI run 41501705990)"
+}

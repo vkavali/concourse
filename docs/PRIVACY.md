@@ -10,7 +10,7 @@ Concourse is a WhatsApp-based travel assistant. A family member ("the child") fo
 
 - **Itinerary facts** extracted from the ticket: flight numbers, airports, scheduled times, terminal and gate.
 - **Journey state**: which step of the journey was sent and acknowledged, and when.
-- **Messages you send to Concourse on WhatsApp**: text, voice notes, photos. Voice notes are transcribed and photos are analysed to produce a reply; the audio and image files are **not stored** by Concourse after the reply is produced.
+- **Messages you send to Concourse on WhatsApp**: text, voice notes, photos. Voice notes are transcribed and photos are analysed to produce a reply; the audio and image files are **not stored** by Concourse after the reply is produced. (A developer running a *recording* session — `TAPE_MODE=record`, never the default — keeps the inputs of that session on their own machine for the demo replay; such recordings are published only with the explicit consent of the person who sent them, and the published demo contains the builder's own voice and rendered sign images, never a traveler's.)
 - **Phone numbers** of the traveler and the family member, stored in hashed form, plus the number itself in a separate table used only to send messages.
 - **Consent**: the traveler's own "start my trip" voice note, recorded as a timestamp.
 
@@ -18,7 +18,7 @@ We do **not** store passport numbers, dates of birth, payment details, or the ti
 
 ## How we use it
 
-Only to run the journey assistance described above. We do not sell data, show ads, or use your content to train AI models. Processing uses Meta's Model API in standard mode (Meta states content in standard mode is not used to train Meta models), Meta's WhatsApp Business Platform, and Meta's open-source MMS-TTS model hosted on Modal.
+Only to run the journey assistance described above. We do not sell data, show ads, or use your content to train AI models. Processing uses Meta's Model API in standard mode (Meta states content in standard mode is not used to train Meta models), Meta's WhatsApp Business Platform, and Meta's open-weight speech models (SeamlessM4T v2 or MMS-TTS) hosted by us on Modal.
 
 ## Retention
 

@@ -115,6 +115,10 @@ public class SparkClient {
                 throw new SparkException(0, "no MODEL_API_KEY and no recording on the tape for this input", false);
             }
         }
+        if (!configured) {
+            note(req.op(), 0, false, "no MODEL_API_KEY");
+            throw new SparkException(0, "no MODEL_API_KEY", false);
+        }
         long t0 = System.currentTimeMillis();
         SparkResponse res;
         try {

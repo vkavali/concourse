@@ -50,7 +50,13 @@ green (`eval/safety/RESULTS.md`); [N] real Telugu voice notes transcribed with [
 **Run it:** the README's "five minutes" path replays a recorded run (every model answer keyed by its input, her sample
 voice notes and sign photos, the synthesized notes) on a laptop with no keys; with a Meta Model API key the calls go
 live; with a WhatsApp test number it runs on real phones. The simulator shows both phones and a ticker naming every Meta
-model call as it happens.
+model call as it happens. CI runs that exact keyless path on every commit (`eval/judge-path/smoke.sh`) and the tape
+itself is recorded by a workflow, so what a judge sees is what CI saw.
+
+**Agentic, with the keys taken away:** Spark proposes — an intent, a tool call (`get_next_stage`, `acknowledge_stage`,
+`request_family_help`, `create_staff_card`), a sign observation — and the controller validates every proposal against the journey's state before
+anything happens; the model never holds the clock, the gate, or her location. The handoffs are to people: airport staff
+(the card) and her son (the thread), never to another model.
 
 **Everything in the repository was built between Oct 26 and Nov 4, 2026; nothing pre-existed.** Apache-2.0.
 

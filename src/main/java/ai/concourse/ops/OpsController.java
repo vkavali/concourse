@@ -352,9 +352,10 @@ public class OpsController {
         out.put("whatsapp", outbox.delivering() ? "delivering to the registered phones" : "not configured — outbox only");
         out.put("meta_api", spark.isConfigured() ? "live (" + spark.model() + ")" : "no MODEL_API_KEY");
         out.put("sam", sam.isConfigured() ? "live (" + sam.model() + ")" : "off");
+        java.util.Set<String> recorded = tts.tapeModels();
         out.put("tts", tts.hasServer() ? "live (" + tts.modelId() + ")"
                 : tape.recording() ? "no TTS_BASE_URL — spoken texts left on the tape for prerender_voice.py"
-                : tts.isConfigured() ? "recorded notes only" : "no voice");
+                : tts.isConfigured() ? "recorded notes" + (recorded.isEmpty() ? " only" : " (" + String.join(", ", recorded) + ")") : "no voice");
         out.put("tape", tape.mode().name().toLowerCase() + (tape.mode() == ModelTape.Mode.OFF ? "" : " at " + tape.dir()));
         out.put("samples", samples());
         return ResponseEntity.ok(out);

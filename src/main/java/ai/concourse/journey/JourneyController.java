@@ -186,7 +186,7 @@ public class JourneyController {
         journeys.save(j);
         eventLog.record(j.getId(), EventLog.ACTOR_PARENT, "consent", Map.of("how", how));
         messenger.speak(parentNumber(j), StageText.CONSENT_THANKS, null, messenger.facts(j));
-        if (!"travel mode".equals(how)) messenger.sendTravelLink(j);
+        if (!"travel mode".equals(how)) messenger.resendTravelLinkIfOlderThan(j, java.time.Duration.ofMinutes(10));
         messenger.tellChild(j, "She said 'start my trip' (" + how + "). Consent recorded; stage pushes are armed. Her travel screen: " + messenger.travelUrl(j));
         advanceDue(j);
     }

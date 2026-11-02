@@ -116,7 +116,12 @@ class TtsClientTest {
         judge.setCallLog(calls);
         assertTrue(judge.isConfigured(), "recordings count as a voice");
         assertArrayEquals(live, judge.synthesizeOggOpus("మీ విమానం. కార్డు చూడండి."));
-        assertEquals("replayed from tape", calls.since(0).get(calls.since(0).size() - 1).note());
+        ModelCallLog.Entry replay = calls.since(0).get(calls.since(0).size() - 1);
+        assertEquals("replayed from tape (facebook/seamless-m4t-v2-large)", replay.note(), "the sidecar names the model that made the note");
+        assertEquals("facebook/seamless-m4t-v2-large", replay.model());
+        assertEquals(java.util.Set.of("facebook/seamless-m4t-v2-large"), judge.tapeModels());
+        String side = Files.readString(Files.list(tapeDir.resolve("tts")).filter(f -> f.toString().endsWith(".json")).findFirst().orElseThrow());
+        assertTrue(side.contains("\"model\" : \"facebook/seamless-m4t-v2-large\"") && side.contains("\"source\" : \"live TTS server\""), side);
         TtsClient.TtsException miss = assertThrows(TtsClient.TtsException.class, () -> judge.synthesizeOggOpus("కొత్త వాక్యం."));
         assertTrue(miss.getMessage().contains("not in the cache or on the tape"));
     }
@@ -134,6 +139,24 @@ class TtsClientTest {
         judge.setTape(new ModelTape("replay", tapeDir.toString(), new ObjectMapper()));
         assertThrows(TtsClient.TtsException.class, () -> judge.synthesizeOggOpus("ఇంకో వాక్యం."));
         assertEquals(1, Files.list(tapeDir.resolve("tts")).count());
+    }
+
+    @Test
+    void aNoteSynthesizedByThePrerenderPassReportsItsOwnModel() throws Exception {
+        Path tts = Files.createDirectories(tapeDir.resolve("tts"));
+        String key = TtsClient.key("note|కార్డు చూడండి.", TtsClient.DEFAULT_RATE);
+        Files.write(tts.resolve(key + ".ogg"), new byte[]{'O', 'g', 'g', 'S', 1, 2, 3});
+        Files.writeString(tts.resolve(key + ".json"), "{\"model\":\"facebook/mms-tts-tel\",\"source\":\"eval/judge-path/prerender_voice.py\"}");
+        Files.write(tts.resolve("orphan.ogg"), new byte[]{'O', 'g', 'g', 'S'});
+        TtsClient judge = new TtsClient("", null, null, 7, "facebook/seamless-m4t-v2-large", WebClient.builder(), noFfmpeg);
+        judge.setTape(new ModelTape("replay", tapeDir.toString(), new ObjectMapper()));
+        ModelCallLog calls = new ModelCallLog();
+        judge.setCallLog(calls);
+        assertEquals(7, judge.synthesizeOggOpus("కార్డు చూడండి.").length);
+        ModelCallLog.Entry e = calls.since(0).get(0);
+        assertEquals("facebook/mms-tts-tel", e.model(), "never the configured label for a note another model made");
+        assertEquals("replayed from tape (facebook/mms-tts-tel)", e.note());
+        assertEquals(java.util.Set.of("facebook/mms-tts-tel"), judge.tapeModels());
     }
 
     @Test

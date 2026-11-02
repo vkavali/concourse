@@ -147,7 +147,8 @@ public class TtsClient {
         }
         byte[] recorded = readTape(key);
         if (recorded != null) {
-            record("note", 0, true, "replayed from tape");
+            String by = tapeModel(key);
+            record(by, "note", 0, true, "replayed from tape (" + by + ")");
             return recorded;
         }
         if (!serverConfigured) {
@@ -174,8 +175,8 @@ public class TtsClient {
             throw new TtsException(0, "empty audio");
         }
         writeCache(key, ".ogg", audio);
-        writeTape(key, audio);
         long ms = System.currentTimeMillis() - t0;
+        writeTape(key, audio, ms);
         record("note", ms, true, phrases.size() + " phrases, " + audio.length / 1024 + " KB");
         log.info("tts ok model={} speaker={} phrases={} chars={} bytes={} ms={}", modelId(), speaker, phrases.size(),
                 teluguText.length(), audio.length, ms);
@@ -224,7 +225,46 @@ public class TtsClient {
     }
 
     private void record(String op, long ms, boolean ok, String note) {
-        if (callLog != null) callLog.record(modelId(), "tts " + op, ms, ok, note);
+        record(modelId(), op, ms, ok, note);
+    }
+
+    private void record(String model, String op, long ms, boolean ok, String note) {
+        if (callLog != null) callLog.record(model, "tts " + op, ms, ok, note);
+    }
+
+    /** The models behind the notes on the tape (from their {@code tts/<key>.json} sidecars), for the status line. */
+    public java.util.Set<String> tapeModels() {
+        java.util.Set<String> out = new java.util.TreeSet<>();
+        if (tape == null || tape.mode() == ModelTape.Mode.OFF || !Files.isDirectory(tape.ttsDir())) return out;
+        try (var files = Files.list(tape.ttsDir())) {
+            files.filter(f -> f.getFileName().toString().endsWith(".json")).forEach(f -> {
+                try {
+                    JsonNode n = JSON.readTree(Files.readString(f, StandardCharsets.UTF_8));
+                    if (n.path("model").isTextual()) out.add(n.path("model").asText());
+                } catch (IOException ignored) {
+                    // a sidecar that cannot be read says nothing
+                }
+            });
+        } catch (IOException ignored) {
+            // no tape dir: nothing to say
+        }
+        return out;
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** Which model made the recorded note: its sidecar's {@code model}, else "unknown model" — never a guess. */
+    private String tapeModel(String key) {
+        try {
+            Path side = tape.ttsDir().resolve(key + ".json");
+            if (Files.exists(side)) {
+                JsonNode n = JSON.readTree(Files.readString(side, StandardCharsets.UTF_8));
+                if (n.path("model").isTextual() && !n.path("model").asText().isBlank()) return n.path("model").asText();
+            }
+        } catch (IOException ignored) {
+            // fall through
+        }
+        return "unknown model";
     }
 
     // ---- cache and tape ----------------------------------------------------------------------------------------
@@ -286,11 +326,20 @@ public class TtsClient {
         }
     }
 
-    private void writeTape(String key, byte[] audio) {
+    /** The note and its sidecar: which model made it, when, how long it took — so a replay can say so. */
+    private void writeTape(String key, byte[] audio, long ms) {
         if (tape == null || !tape.recording()) return;
         try {
             Files.createDirectories(tape.ttsDir());
             Files.write(tape.ttsDir().resolve(key + ".ogg"), audio);
+            Map<String, Object> side = new java.util.LinkedHashMap<>();
+            side.put("recorded_at", java.time.Instant.now().toString());
+            side.put("model", modelId());
+            side.put("op", "note");
+            side.put("ms", ms);
+            side.put("speaker", speaker);
+            side.put("source", "live TTS server");
+            Files.writeString(tape.ttsDir().resolve(key + ".json"), JSON.writerWithDefaultPrettyPrinter().writeValueAsString(side) + "\n", StandardCharsets.UTF_8);
             Files.deleteIfExists(tape.ttsDir().resolve(key + ".txt"));
         } catch (IOException e) {
             log.warn("tape tts write failed: {}", e.getMessage());

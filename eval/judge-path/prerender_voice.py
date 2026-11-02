@@ -4,9 +4,9 @@ Give the tape a voice before (or without) the Seamless recording.
 
 A recording session without a voice server (TAPE_MODE=record, no TTS_BASE_URL) leaves every note it wanted to speak
 as tts/<key>.txt on the tape — the exact spoken-form text under the exact content key the app will look up
-(sha256(text|rate), see TtsClient.key). This script turns each one into tts/<key>.ogg with Meta's open-weight
-MMS-TTS Telugu (facebook/mms-tts-tel), using the same model, settings and ffmpeg chain as modal/mms_tts.py, then
-deletes the .txt. A later live recording with SeamlessM4T v2 overwrites the same keys.
+(sha256(text|rate), see TtsClient.key). This script turns each one into tts/<key>.ogg (plus a tts/<key>.json
+sidecar naming the model, so a replay reports who made the note) with Meta's open-weight MMS-TTS Telugu
+(facebook/mms-tts-tel), using the same model, settings and ffmpeg chain as modal/mms_tts.py, then deletes the .txt. A later live recording with SeamlessM4T v2 overwrites the same keys.
 
     pip install torch --index-url https://download.pytorch.org/whl/cpu
     pip install "transformers>=4.44" scipy numpy uroman
@@ -16,9 +16,13 @@ Runs on a CPU in a few seconds per note. Nothing here calls a non-Meta model.
 """
 import argparse
 import io
+import json
+import os
 import re
 import subprocess
 import sys
+import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 MODEL_ID = "facebook/mms-tts-tel"
@@ -109,12 +113,18 @@ def main() -> int:
     done = 0
     for p in wanted:
         text = p.read_text(encoding="utf-8").strip()
+        t0 = time.monotonic()
         try:
             ogg = wav_to_ogg_opus(voice.wav(text))
         except Exception as e:  # one bad note must not stop the rest
             print(f"  skipped {p.stem[:12]}: {e}", file=sys.stderr)
             continue
         p.with_suffix(".ogg").write_bytes(ogg)
+        p.with_suffix(".json").write_text(json.dumps({
+            "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "model": MODEL_ID, "op": "note", "ms": int((time.monotonic() - t0) * 1000), "rate": args.rate,
+            "source": "eval/judge-path/prerender_voice.py" + (f" (CI run {os.environ['GITHUB_RUN_ID']})" if os.environ.get("GITHUB_RUN_ID") else ""),
+        }, indent=2) + "\n", encoding="utf-8")
         p.unlink()
         done += 1
         print(f"  {p.stem[:12]}.ogg  {len(ogg) // 1024} KB")

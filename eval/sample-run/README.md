@@ -10,6 +10,7 @@ Spark and SAM answers when the repository has a `MODEL_API_KEY` secret, and a vo
 | `spark/<key>.json` | Muse Spark 1.3 outputs: intent classifications, sign observations, the ticket extraction — keyed by a hash of the input (transcript, photo bytes, ticket bytes) with model id, token counts and milliseconds | recorded from live Meta Model API calls |
 | `sam/<key>.json` | SAM 3.1 boxes for the sign in each photo and camera frame (special-token text as returned), keyed by concept + photo hash | recorded from live calls |
 | `stt/<key>.json` | Muse Voice Transcribe 1.0 transcripts, keyed by the audio bytes' hash | recorded from live calls |
+| `tts/<key>.json` | the sidecar of each note: which model made it, when, how long it took, from the live server or the prerender pass — what the ticker reports on replay | written with the note |
 | `tts/<key>.ogg` | the Telugu voice notes Concourse synthesized, keyed by spoken text — SeamlessM4T v2 on Modal when recorded from a live run; until then MMS-TTS Telugu (`facebook/mms-tts-tel`) synthesized by the `tape` workflow in CI (`eval/judge-path/prerender_voice.py`) from the exact texts the app wanted to speak | our own synthesized audio, Meta open weights either way |
 | `inputs/*.wav` | her sample voice notes, as sent through the simulator's 🎤 buttons | recorded by the builder's own voice, with consent — never a parent's note |
 | `inputs/sign-*.jpg` | sample airport signs for the 📷 buttons | **rendered, not photographed**: `GATES B1 – B20 ←`, `GATES C1 – C30 →`, `BAGGAGE CLAIM →`, `TRANSFER FLIGHTS ←` |

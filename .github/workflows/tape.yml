@@ -27,8 +27,8 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Install ffmpeg and jq
-        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg jq
+      - name: Install ffmpeg, jq and a Telugu font (for the screenshot)
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg jq fonts-noto-core
       - name: Record the judge path (TAPE_MODE=record)
         env:
           JUDGE_TAPE_MODE: record

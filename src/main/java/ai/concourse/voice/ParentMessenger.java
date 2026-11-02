@@ -62,15 +62,27 @@ public class ParentMessenger {
         this.travelLinks = travelLinks;
     }
 
+    private final Map<java.util.UUID, Long> travelLinkSentAt = new ConcurrentHashMap<>();
+
     /** The Travel Mode link as a tappable button: "card, voice and camera on one screen — tap to open". */
     public void sendTravelLink(JourneyEntity j) {
         parentOf(j).ifPresent(p -> {
             try {
                 channel.sendLinkButton(p.getE164(), TeluguPhrases.TRAVEL_LINK, TeluguPhrases.TRAVEL_LINK_BUTTON, travelLinks.url(j.getId()));
+                travelLinkSentAt.put(j.getId(), System.currentTimeMillis());
             } catch (RuntimeException e) {
                 log.warn("travel link not sent: {}", e.getMessage());
             }
         });
+    }
+
+    /**
+     * The same link again only when the last one is older than {@code maxAge} — at the bottom of the thread on the
+     * day she travels, not a second identical bubble a minute after the intro.
+     */
+    public void resendTravelLinkIfOlderThan(JourneyEntity j, java.time.Duration maxAge) {
+        Long last = travelLinkSentAt.get(j.getId());
+        if (last == null || System.currentTimeMillis() - last > maxAge.toMillis()) sendTravelLink(j);
     }
 
     public String travelUrl(JourneyEntity j) {

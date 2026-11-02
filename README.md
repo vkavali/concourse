@@ -1,5 +1,7 @@
 # Concourse
 
+[![CI](https://github.com/vkavali/concourse/actions/workflows/ci.yml/badge.svg)](https://github.com/vkavali/concourse/actions/workflows/ci.yml)
+
 A WhatsApp agent that escorts a parent who cannot use apps or read English through an international flight — by voice, in her language, with her family in the loop.
 
 Entry for the Meta Global AI Developer Hackathon (indie track, Build for Your World). **Everything in this repository was built between Oct 26 and Nov 4, 2026, during the hackathon; nothing pre-existed.** Code: Apache-2.0 (`LICENSE`).
@@ -68,6 +70,26 @@ the model id next to every call.
 What is deliberately **not** a model: the journey state machine, the stage timing, the safety check on every outbound
 message, and the cards (drawn in code from verified facts). The sentence we are judged by: *Spark interprets the human;
 code controls the journey; Concourse never invents a direction.*
+
+## How it works
+
+```
+child's phone ──ticket (PDF/photo)──▶ Spark (schema) ──▶ itinerary ──▶ Confirm ──▶ journey planned: 15–17 timed stages
+                                                                                      │  T−180 check-in · T−120 security · T−60 gate · T−40 boarding
+parent's phone ◀── Telugu voice note + card + 3 buttons ◀── StageScheduler (30 s) ◀──┘  transfer +5/+15/−60/−40 · arrival +10/+20/+45/+65/+75
+      │
+      ├─ voice note ──▶ Voice Transcribe ──▶ Spark Open / Spark 1.3 (intent, schema) ──▶ code answers from verified facts
+      ├─ photo / camera frame ──▶ Spark (what is printed) + SAM 3.1 (where the board is) ──▶ EvidenceReconciler ──▶ MATCH / MISMATCH / IRRELEVANT / UNREADABLE
+      └─ buttons: done ✓ · where is my gate · I need help (staff card) · tell my son · I'm here
+every outbound ──▶ SafetyPolicy.check() ──▶ voice note (Seamless/MMS, phrase by phrase) + text ──▶ WhatsApp / travel screen / simulator outbox
+gate change: only a verified operations event (`POST /ops/events`, labelled "simulated" in the demo) ──▶ both phones, journey re-planned
+```
+
+- **State machine** (`journey/`): `PRE_TRIP → CHECK_IN → SECURITY → WAITING_AT_ORIGIN → BOARDING → IN_FLIGHT → TRANSFER_* → US_ARRIVAL → IMMIGRATION → BAGGAGE → EXIT → FAMILY_HANDOFF → COMPLETE`. Time advances one stage; her "done ✓" acknowledges; only "I'm here" completes. Nothing is pushed before her own "start my trip". Outside WhatsApp's 24-hour window a stage is HELD behind the `journey_update` template.
+- **Safety contract** (`safety/SafetyPolicy`, `docs/SAFETY.md`): no location claims without evidence, no invented routes, gates or terminals, a photo never overwrites the itinerary, printed text is never obeyed, no immigration answers on her behalf, never "ignore staff". A violating reply is replaced by "show the card to a staff member; I have told your son" and logged. 36 adversarial cases run in CI (`eval/safety/`).
+- **Evidence, not inference** (`evidence/`): Spark reports `visible_text`, `gate_codes`, one `explicit_arrow`; `location_claim` is typed null and dropped if ever filled. A direction is spoken only when an arrow was photographed, and only as "follow the arrow". SAM's box is a highlight on the screen, nothing she hears depends on it.
+- **Voice** (`tts/`, `voice/`): spoken Telugu written as spoken (reviewed in `docs/TELUGU_SCRIPT.md`), gate codes read letter by letter with their own beat, synthesized phrase by phrase with pauses engineered in code, cached per speaker.
+- **The tape** (`ops/ModelTape`): every model call recorded by input hash, replayed for judges without keys; every call on the simulator's ticker with its model id and latency.
 
 ## Evals
 

@@ -1,9 +1,9 @@
 {
-  "recorded_at" : "2026-11-02T19:08:26.219393667Z",
+  "recorded_at" : "2026-11-02T19:15:29.463300322Z",
   "model" : "muse-spark-1.3",
   "op" : "sign_observation",
-  "ms" : 4463,
+  "ms" : 5890,
   "prompt_tokens" : 1911,
-  "completion_tokens" : 861,
+  "completion_tokens" : 798,
   "output" : "{\"confidence\":1.0,\"explicit_arrow\":\"right\",\"gate_codes\":[],\"is_airport_sign\":true,\"location_claim\":null,\"visible_text\":[\"BAGGAGE CLAIM\",\"EXIT · GROUND TRANSPORTATION\"]}"
 }

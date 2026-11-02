@@ -1,9 +1,9 @@
 {
-  "recorded_at" : "2026-11-02T19:09:43.349221259Z",
+  "recorded_at" : "2026-11-02T19:16:42.533368614Z",
   "model" : "muse-spark-1.3",
   "op" : "itinerary",
-  "ms" : 16024,
+  "ms" : 23099,
   "prompt_tokens" : 3531,
-  "completion_tokens" : 2334,
-  "output" : "{\"booking_reference\":\"DEMO42\",\"is_ticket\":true,\"passenger_first_name\":\"LAKSHMI\",\"reason\":\"This is a confirmed Qatar Airways e-ticket itinerary receipt for two flights.\",\"segments\":[{\"airline\":\"Qatar Airways\",\"arrival_local\":\"2026-11-28T06:05\",\"confidence\":1.0,\"departure_local\":\"2026-11-28T03:45\",\"destination\":\"DOH\",\"flight_number\":\"QR4793\",\"gate\":null,\"notes\":\"Departure terminal and gate not printed.\",\"origin\":\"HYD\",\"terminal\":null},{\"airline\":\"Qatar Airways\",\"arrival_local\":\"2026-11-28T15:50\",\"confidence\":1.0,\"departure_local\":\"2026-11-28T08:40\",\"destination\":\"DFW\",\"flight_number\":\"QR729\",\"gate\":null,\"notes\":\"Departure terminal and gate not printed; arrival terminal D printed.\",\"origin\":\"DOH\",\"terminal\":null}]}"
+  "completion_tokens" : 4293,
+  "output" : "{\"booking_reference\":\"DEMO42\",\"is_ticket\":true,\"passenger_first_name\":\"LAKSHMI\",\"reason\":\"Qatar Airways e-Ticket Itinerary Receipt for two confirmed flights from Hyderabad to Dallas/Fort Worth via Doha.\",\"segments\":[{\"airline\":\"Qatar Airways\",\"arrival_local\":\"2026-11-28T06:05\",\"confidence\":1.0,\"departure_local\":\"2026-11-28T03:45\",\"destination\":\"DOH\",\"flight_number\":\"QR4793\",\"gate\":null,\"notes\":\"Departure terminal and gate not printed.\",\"origin\":\"HYD\",\"terminal\":null},{\"airline\":\"Qatar Airways\",\"arrival_local\":\"2026-11-28T15:50\",\"confidence\":1.0,\"departure_local\":\"2026-11-28T08:40\",\"destination\":\"DFW\",\"flight_number\":\"QR729\",\"gate\":null,\"notes\":\"Departure terminal and gate not printed; Terminal D is arrival terminal.\",\"origin\":\"DOH\",\"terminal\":null}]}"
 }

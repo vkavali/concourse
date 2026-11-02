@@ -1,8 +1,8 @@
 {
-  "recorded_at" : "2026-11-02T19:09:03.310446085Z",
+  "recorded_at" : "2026-11-02T19:16:00.956776161Z",
   "model" : "muse-voice-transcribe-1.0",
   "op" : "transcribe",
-  "ms" : 787,
+  "ms" : 966,
   "audio_ms" : 1840,
-  "output" : "{\"audioDurationMs\":1840,\"transcript\":\"నా ప్రయాణం మొదలు,\"}"
+  "output" : "{\"audioDurationMs\":1840,\"transcript\":\"ना ప్రయాణం మొదలు..\"}"
 }

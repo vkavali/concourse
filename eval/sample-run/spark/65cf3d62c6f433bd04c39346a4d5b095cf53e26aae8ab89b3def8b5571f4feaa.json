@@ -1,9 +1,9 @@
 {
-  "recorded_at" : "2026-11-02T19:08:46.982964726Z",
+  "recorded_at" : "2026-11-02T19:15:41.165260597Z",
   "model" : "muse-spark-1.3",
   "op" : "sign_observation",
-  "ms" : 9866,
+  "ms" : 5333,
   "prompt_tokens" : 1911,
-  "completion_tokens" : 1315,
-  "output" : "{\"confidence\":1.0,\"explicit_arrow\":\"right\",\"gate_codes\":[\"C1-C30\"],\"is_airport_sign\":true,\"location_claim\":null,\"visible_text\":[\"GATES C1 - C30\",\"DEPARTURES\"]}"
+  "completion_tokens" : 1160,
+  "output" : "{\"confidence\": 1.0, \"explicit_arrow\": \"right\", \"gate_codes\": [\"C1-C30\"], \"is_airport_sign\": true, \"location_claim\": null, \"visible_text\": [\"GATES C1 - C30\", \"DEPARTURES\"]}"
 }

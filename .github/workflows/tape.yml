@@ -67,4 +67,5 @@ jobs:
           [ -n "${{ secrets.TTS_BASE_URL }}" ] && voice_note="voice notes recorded from the TTS server"
           git commit -q -m "eval: tape recorded by CI — $key_note; $voice_note" \
                         -m "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          git pull --rebase origin main   # main may have moved while the tape was recording
           git push

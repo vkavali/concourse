@@ -110,6 +110,23 @@ public class OpsController {
 
     public record DemoRequest(String child, String parent, Integer days_ahead) {}
 
+    /** Placeholder numbers for the simulator when WhatsApp is off: two, so both phone columns fill. Never dialled. */
+    static final String SIM_CHILD = "10000000000", SIM_PARENT = "10000000001";
+
+    /**
+     * {child, parent} for a demo request, or null when no usable child number was given. Without WhatsApp the
+     * simulator is the only phone, so blanks become the two placeholders; with WhatsApp a blank parent means one
+     * real phone plays both roles.
+     */
+    static String[] phones(DemoRequest r, boolean sim) {
+        String child = PhoneHasher.normalize(r.child() == null ? "" : r.child());
+        if (child.length() < 10 && sim) child = SIM_CHILD;
+        if (child.length() < 10) return null;
+        String parent = PhoneHasher.normalize(r.parent() == null ? "" : r.parent());
+        if (parent.length() < 10) parent = sim ? (child.equals(SIM_PARENT) ? SIM_CHILD : SIM_PARENT) : child;
+        return new String[]{child, parent};
+    }
+
     // ---- the gate change --------------------------------------------------------------------------------------
 
     @PostMapping("/events")
@@ -151,10 +168,9 @@ public class OpsController {
     @PostMapping("/demo")
     public ResponseEntity<?> demo(@RequestHeader(value = "X-Admin-Token", required = false) String token, @RequestBody DemoRequest r) {
         if (!authorized(token)) return forbidden();
-        String child = PhoneHasher.normalize(r.child() == null ? "" : r.child());
-        if (child.length() < 10 && !outbox.delivering()) child = "10000000000"; // no WhatsApp: the simulator is the only phone
-        String parent = PhoneHasher.normalize(r.parent() == null || r.parent().isBlank() ? child : r.parent());
-        if (child.length() < 10) return ResponseEntity.badRequest().body(Map.of("error", "child must be a WhatsApp number with country code"));
+        String[] who = phones(r, !outbox.delivering());
+        if (who == null) return ResponseEntity.badRequest().body(Map.of("error", "child must be a WhatsApp number with country code"));
+        String child = who[0], parent = who[1];
         LocalDate day = LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(r.days_ahead() == null ? 2 : Math.max(1, r.days_ahead()));
         String d = day.toString();
         Itinerary raw = new Itinerary(true, "sample itinerary", "Lakshmi", "DEMO42", List.of(
@@ -180,10 +196,9 @@ public class OpsController {
     @PostMapping("/demo-ticket")
     public ResponseEntity<?> demoFromTicket(@RequestHeader(value = "X-Admin-Token", required = false) String token, @RequestBody DemoRequest r) {
         if (!authorized(token)) return forbidden();
-        String child = PhoneHasher.normalize(r.child() == null ? "" : r.child());
-        if (child.length() < 10 && !outbox.delivering()) child = "10000000000";
-        String parent = PhoneHasher.normalize(r.parent() == null || r.parent().isBlank() ? child : r.parent());
-        if (child.length() < 10) return ResponseEntity.badRequest().body(Map.of("error", "child must be a WhatsApp number with country code"));
+        String[] who = phones(r, !outbox.delivering());
+        if (who == null) return ResponseEntity.badRequest().body(Map.of("error", "child must be a WhatsApp number with country code"));
+        String child = who[0], parent = who[1];
         Path ticket = Path.of(SAMPLE_TICKET);
         if (!Files.isRegularFile(ticket)) return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "no sample ticket at " + SAMPLE_TICKET));
         byte[] bytes;

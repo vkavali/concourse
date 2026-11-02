@@ -139,6 +139,7 @@
       const d = await call('POST', '/ops/demo', {child: $('child').value.trim() || '10000000000', parent: $('parent').value.trim(), days_ahead: 2});
       say('Demo journey ' + d.journey_id.slice(0,8) + ' for ' + d.date + (d.parent_is_child ? ' (one phone plays both)' : '') + ' — intro sent.');
       lastSeq = 0; $('parentFeed').innerHTML = ''; $('childFeed').innerHTML = '';
+      lastSeq = 0; $('parentFeed').innerHTML = ''; $('childFeed').innerHTML = '';
       refresh();
     } catch (e) { say(e.message, true); }
   }

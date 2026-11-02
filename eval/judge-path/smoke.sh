@@ -205,6 +205,11 @@ $(jq -r '.[] | select(.role=="parent") | "\(.seq) \(.kind) \(.text | split("\n")
 \`\`\`
 </details>"
 echo "$SUMMARY" > "$OUT/summary.md"
+echo
+echo "---- outbox (seq role kind bytes | text | buttons) ----"
+jq -r '.[] | "\(.seq) \(.role) \(.kind) \(.bytes) | \(.text | gsub("\n"; " ⏎ ") | .[0:200]) | \(.buttons | join(" / "))"' "$OUT/outbox.json"
+echo "---- model calls (model op ms ok note) ----"
+jq -r '.[] | "\(.model) \(.op) \(.ms) \(.ok) \(.note)"' "$OUT/models.json" | head -60
 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then echo "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"; fi
 echo
 echo "judge path OK — $FIRED stages, $VOICE voice notes, $SAMPLE_OK/$((SAMPLE_OK + SAMPLE_FAIL)) samples from tape, ticket: $TICKET"

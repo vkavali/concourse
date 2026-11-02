@@ -33,6 +33,18 @@ class OpsRedateTest {
     }
 
     @Test
+    void twoPlaceholderPhonesWithoutWhatsAppOnePhoneForBothWithIt() {
+        OpsController.DemoRequest blank = new OpsController.DemoRequest("", "", 2);
+        assertArrayEquals(new String[]{"10000000000", "10000000001"}, OpsController.phones(blank, true), "simulator: both columns fill");
+        assertNull(OpsController.phones(blank, false), "real WhatsApp needs a real child number");
+        OpsController.DemoRequest one = new OpsController.DemoRequest("+1 716 555 0123", null, null);
+        assertArrayEquals(new String[]{"17165550123", "17165550123"}, OpsController.phones(one, false), "one real phone plays both");
+        assertArrayEquals(new String[]{"17165550123", "10000000001"}, OpsController.phones(one, true));
+        OpsController.DemoRequest two = new OpsController.DemoRequest("17165550123", "91 98765 43210", null);
+        assertArrayEquals(new String[]{"17165550123", "919876543210"}, OpsController.phones(two, false));
+    }
+
+    @Test
     void unparseableDatesAreLeftAlone() {
         Itinerary odd = new Itinerary(true, "sample", "L", "X", List.of(
                 new Itinerary.Segment("A", "A1", "HYD", "DOH", "soon", null, null, null, 0.5, "")));

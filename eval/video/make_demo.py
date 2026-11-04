@@ -33,37 +33,37 @@ MAX_SECONDS = 178  # the rules stop at 3:00; keep a margin
 # cap text in English: what the viewer reads while it happens (the meaning of what she hears, where a note plays)
 STORY = [
     dict(kind="api", method="POST", path="/ops/demo-ticket", body={"child": "", "parent": "", "days_ahead": 2}, hold=9, cap=0,
-         text="Her son forwards the ticket. Muse Spark reads it into an itinerary — HYD → DOH → DFW — and the journey is built.",
+         text="Her son forwards the ticket. Muse Spark reads it; the journey is built: HYD → DOH → DFW, 15 stages.",
          vo="He forwards her ticket on WhatsApp. Muse Spark reads it into an itinerary, and the journey is built: fifteen stages, Hyderabad to Dallas."),
     dict(kind="sample", name="voice-start-my-trip.wav", hold=13, cap=9,
-         text="She sends a voice note: “start my trip.” Voice Transcribe + Spark → consent recorded. She hears: “All right. Your trip has started. I will tell you what to do when it is time.”",
+         text="Her voice note: “start my trip.” She hears: “All right. Your trip has started. I will tell you what to do when it is time.”",
          vo="She says “start my trip”, in Telugu. Voice Transcribe and Spark understand her, and she hears — [pause: her voice note plays]"),
-    dict(kind="next", stages=1, hold=12, cap=10,
-         text="Check-in, at its time: a card with the word on the board and a Telugu voice note. “Go to the Qatar Airways counter. Give passport and ticket. Hand over the big bag. Take the boarding pass.”",
+    dict(kind="next", stages=1, hold=12, cap=10, pip="checkin", pip_at=3.0,
+         text="Check-in, at its time — her phone (right): the card and the note. “Go to the Qatar Airways counter. Give passport and ticket. Hand over the big bag. Take the boarding pass.”",
          vo="At check-in time she gets a card with the word on the board, and a voice note. [pause: her voice note plays]"),
     dict(kind="next", stages=5, gap=1.6, hold=2, cap=0,
-         text="Every stage fires on the journey's clock — security, the gate, boarding, the flight, landing in Doha. Code owns the timing; the model never does.",
+         text="Every stage fires on the journey's clock: security, gate, boarding, the flight, Doha. Code owns the timing.",
          vo="Every stage fires on the journey's clock. Code owns the timing — the model never does."),
     dict(kind="next", stages=1, hold=6, cap=6,
-         text="Doha. Her next gate is not announced yet, and Concourse says exactly that — it never invents a gate.",
+         text="Doha. Her next gate is not announced yet — and that is exactly what she is told.",
          vo="Doha. Her next gate isn't announced yet, and Concourse says exactly that."),
-    dict(kind="api", method="POST", path="/ops/events", body={"type": "GATE_CHANGE", "segment": 2, "new_gate": "D14", "source": "demo operations event"}, hold=12, cap=10,
-         text="A verified operations event (simulated here, labelled) sets gate D14. Both phones get it: her card and voice note, his update. Only this path can change a gate.",
+    dict(kind="api", method="POST", path="/ops/events", body={"type": "GATE_CHANGE", "segment": 2, "new_gate": "D14", "source": "demo operations event"}, hold=12, cap=10, pip="gate", pip_at=3.0,
+         text="A verified operations event sets gate D14 (simulated, labelled). Her phone: the new card and note. His phone: the update.",
          vo="A verified operations event sets gate D14 — simulated here, and labelled. Both phones get it. [pause: her voice note plays]"),
     dict(kind="sample", name="voice-where-is-my-gate.wav", hold=16, cap=12,
-         text="She asks, by voice: “Where is my gate?” Transcribed, classified, answered from verified facts only. She hears: “Your Qatar Airways flight leaves from gate D14. Again: gate D14. See the card.”",
+         text="Her voice note: “Where is my gate?” She hears: “Your Qatar Airways flight leaves from gate D14. Again: gate D14. See the card.”",
          vo="She asks where her gate is. Answered from verified facts only: [pause: her voice note plays — “your flight leaves from gate D14”]"),
-    dict(kind="sample", name="sign-gates-b1-b20-left.jpg", hold=15, cap=10,
-         text="She photographs a sign. SAM 3.1 finds the board, Spark reads it: gates B. Verdict MISMATCH — “this board is not your gate; yours is D14; look for boards that say D.” No route is invented.",
+    dict(kind="sample", name="sign-gates-b1-b20-left.jpg", hold=15, cap=10, pip="sign", pip_at=4.0,
+         text="Her photo of a sign. SAM 3.1 finds the board, Spark reads it: gates B. She hears: “This board is not your gate. Yours is D14. Look for boards that say D.”",
          vo="She photographs a sign. SAM finds the board, Spark reads it: gates B. That's a mismatch, and she's told so. [pause: her voice note plays] No route is invented."),
     dict(kind="sample", name="voice-i-am-lost.wav", hold=12, cap=6,
-         text="“I'm lost.” She gets her card, a camera button, and calm words; her son gets a message. Concourse never claims to know where she is.",
+         text="Her voice note: “I'm lost.” She gets her card and calm words; her son gets a message. No one claims to know where she is.",
          vo="“I'm lost.” [pause: her voice note plays] Her son is told. Concourse never claims to know where she is."),
     dict(kind="next", stages=8, gap=1.4, hold=2, cap=0,
          text="Boarding, the long flight, Dallas: arrivals, immigration (she answers the officer herself), baggage, exit.",
          vo="Boarding, the long flight, Dallas. Arrivals, immigration — she answers the officer herself — baggage, exit."),
-    dict(kind="api", method="POST", path="/ops/journeys/latest/here", body=None, hold=8, cap=4,
-         text="Outside, she presses “I'm here.” Her son's phone: journey complete. Not tracked — she told her family.",
+    dict(kind="api", method="POST", path="/ops/journeys/latest/here", body=None, hold=8, cap=4, pip="here", pip_at=2.0,
+         text="Outside, she presses “I'm here.” Her son's phone: journey complete.",
          vo="Outside, she presses “I'm here”. [pause: her voice note plays] Not tracked. She told her family."),
 ]
 
@@ -144,11 +144,38 @@ def record(base, token, outdir):
         page.evaluate("() => { try { loadStatus(); } catch (e) {} }")
         time.sleep(2.5)
 
-        captions, notes = [], []
+        captions, notes, pips = [], [], []
         last_seq = 0
         _, before = api(base, token, "GET", "/ops/outbox?after=0")
         if before:
             last_seq = max(e["seq"] for e in before)
+        (out / "shots").mkdir(exist_ok=True)
+        phone = None  # her Travel Mode screen, opened once the journey exists
+
+        def open_phone():
+            nonlocal phone
+            _, entries = api(base, token, "GET", "/ops/outbox?after=0")
+            link = next((line for e in reversed(entries or []) if e["kind"] == "link" for line in e["text"].splitlines() if "travel.html#" in line), None)
+            if not link:
+                print("  (no travel link in the outbox; no phone screen)")
+                return
+            phone = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
+            phone.goto(link.strip(), wait_until="domcontentloaded")
+            phone.evaluate("() => { try { begin(); } catch (e) {} }")
+            time.sleep(1.5)
+
+        def shoot(name, at, seconds=7):
+            if phone is None:
+                return
+            try:
+                phone.evaluate("() => { try { refresh(true); } catch (e) {} }")
+                time.sleep(1.5)
+                f = out / "shots" / f"{name}.png"
+                phone.screenshot(path=str(f))
+                pips.append({"t": round(at, 2), "file": f.name, "seconds": seconds})
+                print(f"  phone screen {name} at {at:.1f}s")
+            except Exception as e:
+                print(f"  (phone screen {name} failed: {e})")
 
         def new_voice_note(cap, at):
             nonlocal last_seq
@@ -198,6 +225,13 @@ def record(base, token, outdir):
                     new_voice_note(step["cap"], time.time() - t0)
             end = start + step["hold"] + (step["stages"] * step.get("gap", 1.5) if step["kind"] == "next" and step["stages"] > 1 else 0)
             captions.append({"start": round(start, 2), "end": round(end, 2), "text": step["text"]})
+            if step["kind"] == "api" and step["path"] == "/ops/demo-ticket":
+                open_phone()
+            if step.get("pip"):
+                wait = start + step["pip_at"] - (time.time() - t0)
+                if wait > 0:
+                    time.sleep(wait)
+                shoot(step["pip"], start + step["pip_at"] + 1.5)
             if time.time() - t0 > end:
                 print(f"  (step ran {time.time() - t0 - end:.1f}s over its slot)")
             planned = end
@@ -215,7 +249,7 @@ def record(base, token, outdir):
         c["end"] = min(c["end"], captions[i + 1]["start"] if i + 1 < len(captions) else total)
     for c, step in zip(captions, STORY):
         c["vo"] = step["vo"]
-    (out / "timeline.json").write_text(json.dumps({"total": round(total, 2), "captions": captions, "notes": notes, "cards": CARD_SECONDS, "card_vo": CARD_VO}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (out / "timeline.json").write_text(json.dumps({"total": round(total, 2), "captions": captions, "notes": notes, "pips": pips, "cards": CARD_SECONDS, "card_vo": CARD_VO}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (out / "VOICEOVER.md").write_text(voiceover_sheet(captions, total), encoding="utf-8")
     print(f"recorded {total:.1f}s of demo, {len(notes)} voice notes, {len(captions)} captions → {out}")
     return 0
@@ -298,7 +332,16 @@ def assemble(workdir, output, narration=None, narration_offset=None):
         filters.append(f"anullsrc=channel_layout=stereo:sample_rate=48000,atrim=0:{total}[mixed]")
         audio_map = ["-map", "[mixed]"]
     style = "FontName=DejaVu Sans,FontSize=11,PrimaryColour=&H00FFFFFF,OutlineColour=&HB0000000,BackColour=&H90000000,BorderStyle=4,Outline=1,Shadow=0,MarginV=22,MarginL=90,MarginR=90,Alignment=2"
-    filters.append(f"[0:v]scale={W}:{H},format=yuv420p,subtitles={srt.as_posix()}:force_style='{style}'[v]")
+    filters.append(f"[0:v]scale={W}:{H},format=yuv420p[base]")
+    cur = "[base]"
+    for k, pip in enumerate(tl.get("pips", [])):
+        idx = len(inputs) // 2
+        inputs += ["-i", str(out / "shots" / pip["file"])]
+        a, b = pip["t"], pip["t"] + pip["seconds"]
+        filters.append(f"[{idx}:v]scale=340:-1,pad=iw+12:ih+12:6:6:color=#f3c84a,fade=t=in:st={a}:d=0.3:alpha=1,fade=t=out:st={b - 0.3}:d=0.3:alpha=1[p{k}]")
+        filters.append(f"{cur}[p{k}]overlay=x=1176:y=96:enable='between(t,{a},{b})'[o{k}]")
+        cur = f"[o{k}]"
+    filters.append(f"{cur}subtitles={srt.as_posix()}:force_style='{style}'[v]")
     demo = out / "demo.mp4"
     run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inputs, "-filter_complex", ";".join(filters),
          "-map", "[v]", *audio_map, "-t", total, "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-r", FPS,

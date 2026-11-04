@@ -458,12 +458,16 @@ public class OpsController {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("sample", name);
+        String her = contacts.findByHash(j.get().getParentPhoneHash()).map(ContactEntity::getE164).orElse(null);
         try {
             if (isAudio(name)) {
-                ParentTurnService.Reply r = parentTurns.handleAudio(j.get(), normalisedWav(file, bytes), "simulator");
+                byte[] wav = normalisedWav(file, bytes);
+                if (her != null) outbox.heard(her, "in-voice", wav, "audio/wav", "she sent a voice note (" + name + ")");
+                ParentTurnService.Reply r = parentTurns.handleAudio(j.get(), wav, "simulator");
                 out.put("outcome", r.outcome()); out.put("intent", r.intent()); out.put("telugu", r.telugu());
             } else {
                 String mime = name.endsWith(".png") ? "image/png" : "image/jpeg";
+                if (her != null) outbox.heard(her, "in-image", bytes, mime, "she sent a photo (" + name + ")");
                 SignEvidenceService.Assessment a = signs.handleImage(j.get(), bytes, mime, "simulator");
                 out.put("verdict", a.verdict().kind().name()); out.put("english", a.verdict().english()); out.put("telugu", a.verdict().telugu());
             }

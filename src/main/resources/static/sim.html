@@ -42,6 +42,8 @@
   .phone .feed { flex:1; overflow:auto; display:flex; flex-direction:column; gap:8px; padding:4px 2px; }
   .msg { max-width:88%; padding:8px 11px; border-radius:12px; background:#232835; white-space:pre-wrap; word-break:break-word; }
   .msg.parent { background:#20342a; } .msg.child { background:#1f2a40; }
+  .msg.inbound { align-self:flex-end; background:#3a3f2a; border:1px solid #6b6a3a; }
+  .msg.inbound img.card { background:transparent; max-height:220px; object-fit:contain; }
   .msg .meta { font-size:11px; color:var(--mute); margin-bottom:3px; }
   .msg .btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
   .msg .btns span { font-size:12px; padding:3px 8px; border:1px solid var(--line); border-radius:999px; }
@@ -213,14 +215,17 @@
         lastSeq = Math.max(lastSeq, e.seq);
         const feed = e.role === 'parent' ? $('parentFeed') : $('childFeed');
         const div = document.createElement('div');
-        div.className = 'msg ' + (e.role === 'parent' ? 'parent' : 'child');
+        const inbound = e.kind === 'in-voice' || e.kind === 'in-image';
+        div.className = 'msg ' + (e.role === 'parent' ? 'parent' : 'child') + (inbound ? ' inbound' : '');
         let body = '';
-        if (e.kind === 'voice') body = '<span class="voice">🔊 voice note</span> <span class="img">(' + Math.round(e.bytes/1024) + ' KB)</span>';
+        if (e.kind === 'in-voice') body = '<span class="voice">🎤 she sent a voice note</span>';
+        else if (e.kind === 'in-image') body = '<span class="voice">📷 she sent a photo</span>';
+        else if (e.kind === 'voice') body = '<span class="voice">🔊 voice note</span> <span class="img">(' + Math.round(e.bytes/1024) + ' KB)</span>';
         else if (e.kind === 'image') body = '<span class="img">🖼 card · ' + esc(e.text) + '</span>';
         else if (e.kind === 'template') body = '<span class="img">📨 template ' + esc(e.text) + '</span>';
         else body = linkify(e.text);
         if (e.buttons && e.buttons.length) body += '<div class="btns">' + e.buttons.map(b => '<span>' + esc(b) + '</span>').join('') + '</div>';
-        div.innerHTML = '<div class="meta">' + new Date(e.at).toLocaleTimeString() + ' · ' + e.kind + '</div>' + body;
+        div.innerHTML = '<div class="meta">' + new Date(e.at).toLocaleTimeString() + ' · ' + (inbound ? 'from her' : e.kind) + '</div>' + body;
         feed.appendChild(div);
         if (e.mediaType) {
           media(e.seq, e.mediaType.startsWith('audio')).then(url => {

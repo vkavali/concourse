@@ -91,6 +91,14 @@ public class OutboxChannel implements MessagingChannel {
         return delegate.downloadMedia(mediaId);
     }
 
+    /**
+     * What she sent, shown on her phone in the simulator: a sample voice note or photo pressed on the console
+     * ({@code kind} {@code in-voice} / {@code in-image}). Memory only, like every outbox entry; nothing leaves.
+     */
+    public long heard(String from, String kind, byte[] media, String contentType, String note) {
+        return record(from, kind, note == null ? "" : note, List.of(), media == null ? null : new Media(contentType, media));
+    }
+
     /** Entries after {@code afterSeq}, oldest first. */
     public synchronized List<Entry> since(long afterSeq) {
         List<Entry> out = new ArrayList<>();

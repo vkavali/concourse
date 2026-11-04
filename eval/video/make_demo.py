@@ -164,8 +164,13 @@ def record(base, token, outdir):
                 notes.append({"t": round(at, 2), "file": f.name, "cap": cap, "seq": picked["seq"]})
                 print(f"  voice note seq {picked['seq']} at {at:.1f}s (cap {cap}s)")
 
+        planned = 0.0
         for step in STORY:
-            start = time.time() - t0
+            # fixed schedule: every take has the same timeline, so a narration recorded against one cut fits the next
+            wait = planned - (time.time() - t0)
+            if wait > 0:
+                time.sleep(wait)
+            start = planned
             if step["kind"] == "api":
                 code, body = api(base, token, step["method"], step["path"], step["body"])
                 print(f"{start:6.1f}s {step['method']} {step['path']} → {code}")
@@ -193,11 +198,13 @@ def record(base, token, outdir):
                     new_voice_note(step["cap"], time.time() - t0)
             end = start + step["hold"] + (step["stages"] * step.get("gap", 1.5) if step["kind"] == "next" and step["stages"] > 1 else 0)
             captions.append({"start": round(start, 2), "end": round(end, 2), "text": step["text"]})
-            remaining = end - (time.time() - t0)
-            if remaining > 0:
-                time.sleep(remaining)
-        time.sleep(2)
-        total = time.time() - t0
+            if time.time() - t0 > end:
+                print(f"  (step ran {time.time() - t0 - end:.1f}s over its slot)")
+            planned = end
+        remaining = planned + 2 - (time.time() - t0)
+        if remaining > 0:
+            time.sleep(remaining)
+        total = planned + 2
         video = page.video
         context.close()
         raw = Path(video.path())

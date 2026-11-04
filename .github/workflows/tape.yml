@@ -48,6 +48,7 @@ jobs:
           MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
           TTS_BASE_URL: ${{ secrets.TTS_BASE_URL }}
           TTS_TOKEN: ${{ secrets.TTS_TOKEN }}
+          TTS_SPEAKER: ${{ secrets.TTS_SPEAKER || '0' }}
         run: eval/judge-path/smoke.sh
       - name: Voice for the notes no server spoke (MMS-TTS Telugu, Meta open weights)
         if: ${{ inputs.voice }}

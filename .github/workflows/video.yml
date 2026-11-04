@@ -1,0 +1,71 @@
+name: video
+# The demo video, made from the judge path: the real app in TAPE_MODE=replay, the simulator in its recording layout,
+# the demo run at a viewer's pace while the browser is recorded; her Telugu voice notes mixed in at their moments,
+# English captions burned in, title and end cards. The mp4 and everything needed to re-mix it (a narration track can
+# be added with `make_demo.py assemble ... narration.m4a`) are pushed to the `video` branch and attached to a release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: video
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install ffmpeg, fonts and a browser
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q ffmpeg fonts-noto-core fonts-dejavu-core
+          python3 -m pip install -q playwright && python3 -m playwright install --with-deps chromium
+      - name: Boot Concourse on the tape (no keys)
+        run: |
+          ./gradlew bootJar --no-daemon -q --console=plain
+          export ADMIN_TOKEN=judge TAPE_MODE=replay TAPE_DIR=eval/sample-run SERVER_PORT=18080 PUBLIC_BASE_URL=http://localhost:18080
+          export DATABASE_URL="jdbc:h2:file:$PWD/build/video-db;MODE=PostgreSQL" TTS_CACHE_DIR="$PWD/build/video-tts-cache"
+          unset MODEL_API_KEY WHATSAPP_TOKEN WHATSAPP_PHONE_NUMBER_ID TTS_BASE_URL
+          nohup java -jar build/libs/concourse-0.1.0.jar > build/video-app.log 2>&1 &
+          for i in $(seq 1 120); do curl -fs http://localhost:18080/actuator/health 2>/dev/null | grep -q UP && break; sleep 1; done
+          curl -fs http://localhost:18080/actuator/health | grep -q UP || { tail -50 build/video-app.log; exit 1; }
+      - name: Record the demo
+        run: python3 eval/video/make_demo.py record http://localhost:18080 judge build/video
+      - name: Assemble the mp4
+        run: python3 eval/video/make_demo.py assemble build/video build/video/concourse-demo.mp4
+      - name: Keep everything for a re-mix on the video branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          rm -rf build/video/raw build/video/silent.mp4 build/video/c?.mp4 build/video/demo.mp4 build/video/concat.txt || true
+          mkdir -p /tmp/videobranch && cp -r build/video/. /tmp/videobranch/
+          cd /tmp/videobranch
+          printf '# Concourse demo video\n\nMade by the `video` workflow (run %s) from the judge path. `concourse-demo.mp4` is the film;\n`demo.webm` + `audio/` + `cards/` + `timeline.json` are its parts; `VOICEOVER.md` is the cue sheet for a narration;\n`python3 eval/video/make_demo.py assemble . concourse-demo.mp4 narration.m4a` (from main) re-mixes it with one.\n' "${{ github.run_id }}" > README.md
+          git init -q -b video
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "video: demo made by CI run ${{ github.run_id }}"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" video
+      - name: Attach the mp4 to a release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="demo-video-${{ github.run_number }}"
+          gh release create "$tag" /tmp/videobranch/concourse-demo.mp4 /tmp/videobranch/VOICEOVER.md /tmp/videobranch/demo.srt \
+            --title "Demo video (CI run ${{ github.run_number }})" \
+            --notes "Made by the video workflow from the judge path: the real app replaying recorded Meta model calls, her Telugu voice notes, English captions. See VOICEOVER.md to add a narration."
+      - name: Upload as a workflow artifact too
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-video
+          path: /tmp/videobranch/concourse-demo.mp4
+          if-no-files-found: ignore

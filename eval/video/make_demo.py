@@ -338,7 +338,7 @@ def assemble(workdir, output, narration=None, narration_offset=None):
         idx = len(inputs) // 2
         inputs += ["-i", str(out / "shots" / pip["file"])]
         a, b = pip["t"], pip["t"] + pip["seconds"]
-        filters.append(f"[{idx}:v]scale=340:-1,pad=iw+12:ih+12:6:6:color=#f3c84a,fade=t=in:st={a}:d=0.3:alpha=1,fade=t=out:st={b - 0.3}:d=0.3:alpha=1[p{k}]")
+        filters.append(f"[{idx}:v]scale=340:-1,pad=iw+12:ih+12:6:6:color=#f3c84a[p{k}]")  # a still: no fade (it has no timeline of its own)
         filters.append(f"{cur}[p{k}]overlay=x=1176:y=96:enable='between(t,{a},{b})'[o{k}]")
         cur = f"[o{k}]"
     filters.append(f"{cur}subtitles={srt.as_posix()}:force_style='{style}'[v]")

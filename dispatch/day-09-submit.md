@@ -20,3 +20,13 @@
 - [ ] Ask the NRI circle to vote when the public gallery opens (Nov 9+).
 - [ ] Prepare for Nov 9 live final (judges watch the video live): 2-sentence intro ready.
 - [ ] Rest.
+
+## Actual — Wed Nov 4 (what really happens today)
+No phone run and no elder happened on Nov 2–3, so the plan above is replaced by this:
+- [x] CC: the film made by CI from the judge path (`video` workflow) — 2:50, her voice notes, captions, cards; `video` branch + Releases.
+- [x] CC: README "Status at submission" and `docs/SUBMISSION.md` say plainly what was and was not verified; placeholders gone.
+- [ ] vv: record the narration against the final cut (`VOICEOVER.md` in the release), send the file → CC mixes it in, pushes the narrated mp4 to the `video` branch and a release.
+- [ ] vv: download the narrated mp4 → YouTube (public or unlisted) → check the link logged out.
+- [ ] vv: X post (text in `docs/SUBMISSION.md`) with the YouTube link.
+- [ ] vv: the form — team Concourse · Indie · Build for Your World · repo · video link · X link · description (paste from `docs/SUBMISSION.md`) · solo team → submit **before 6:00 PM CT**, screenshot the confirmation.
+- Fallback at 5:00 PM CT with no narration: submit the captions-only cut from the latest release. Never miss the form for the voice-over.

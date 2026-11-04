@@ -1,4 +1,9 @@
-# Walkthrough results — (date, participant: age band, relation, consent recorded Y/N)
+# Walkthrough results — NOT RUN before the Nov 4 submission
+
+No elderly Telugu-speaking participant used Concourse before the deadline; the table below is the protocol's
+record sheet, empty. The claim we make instead is the recorded end-to-end run in `eval/judge-path/`.
+
+# (template) Walkthrough results — (date, participant: age band, relation, consent recorded Y/N)
 
 Setup: laptop + ngrok, `TAPE_MODE=record`, voice = (Seamless speaker N), stages fired from the simulator.
 

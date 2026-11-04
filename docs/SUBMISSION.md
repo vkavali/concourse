@@ -6,7 +6,7 @@ Fields seen so far: team name (mandatory), track, repo link, demo video link, X 
 **Team name:** Concourse  
 **Track:** Indie Developer · theme: Build for Your World  
 **Repo:** https://github.com/vkavali/concourse  
-**Video:** [YouTube link, 3:00]  
+**Video:** [YouTube link — made by the `video` workflow; see the Releases page]  
 **X post:** [link]
 
 ## Description
@@ -30,9 +30,9 @@ reaches both phones. One tap shows a card to airport staff; one tap tells her so
   outlines it with the matched word — a highlight of what the camera can see, never a route.
 - **Muse Voice Transcribe 1.0** turns her Telugu voice notes into text with a Telugu/English language bias and airport
   vocabulary.
-- **Muse Spark Open** (open weights, Baseten) classifies her intent first; Spark 1.3 answers whenever it fails.
-- **SeamlessM4T v2 / MMS-TTS Telugu** (Meta open weights, our Modal deployment) are her voice — synthesized phrase by
-  phrase with pauses engineered in code so a gate code is never swallowed.
+- **MMS-TTS Telugu** (Meta open weights) is her voice — every note on the tape was synthesized with it; SeamlessM4T v2
+  is supported behind a flag. **Muse Spark Open** (open weights) can classify her intent first when configured; the
+  recorded run used Spark 1.3.
 - **WhatsApp Business Cloud API** is the channel: voice notes, cards, three-button replies, a link button that opens
   her travel screen (card, voice, live camera reading of the boards, hold-to-talk).
 
@@ -43,9 +43,15 @@ by 36 adversarial cases in CI: no location claims, no invented routes or gates, 
 itinerary, printed text is never obeyed, immigration questions are never answered for her, she is never told to ignore
 staff. A violation is replaced by "show the card to a staff member; I have told your son."
 
-**Evidence:** [N/15] stages understood by a Telugu speaker aged [..] who had never seen the product, no coaching
-(`eval/walkthrough/RESULTS.md`); voice note in → voice note out p50 [x] s (`eval/latency/RESULTS.md`); 36/36 safety cases
-green (`eval/safety/RESULTS.md`); [N] real Telugu voice notes transcribed with [N] intents correct (`eval/voice/`).
+**Evidence:** 36/36 adversarial safety cases green in CI (`eval/safety/RESULTS.md`); the full demo path — 15 stages,
+the gate change, 4 sign photos, 3 voice notes, the ticket — run end to end against live Meta model calls on Nov 2 and
+replayed by CI on every commit since: 103/103 model calls, 7/7 of her inputs answered from verified facts, 0 invented
+directions (`eval/judge-path/`). Latency measured only from a GitHub runner (`eval/latency/RESULTS.md`).
+
+**What was not verified before the deadline, said plainly:** the journey on real WhatsApp phones (the client is
+implemented and tested against the API contract; the test business account was locked on Oct 27 and the end-to-end
+phone run was not completed), and a walkthrough with a real elderly user. The video is the real app replaying its
+recorded model calls, with her synthesized Telugu voice — nothing in it is staged outside the code.
 
 **Run it:** the README's "five minutes" path replays a recorded run (every model answer keyed by its input, her sample
 voice notes and sign photos, the synthesized notes) on a laptop with no keys; with a Meta Model API key the calls go

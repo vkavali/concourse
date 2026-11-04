@@ -67,6 +67,14 @@ N/N instructions understood · 0 invented directions
 opener, the one-line problem, the rule, the Meta models, and the evidence numbers (fill the placeholders from
 `eval/walkthrough/RESULTS.md` and `eval/latency/RESULTS.md`). Screen-record them for the cuts.
 
+## The video as submitted — made by CI from the judge path (`.github/workflows/video.yml`)
+`eval/video/make_demo.py` runs the demo against the app in `TAPE_MODE=replay` while recording the simulator in its
+recording layout; her Telugu voice notes are mixed in at the second they arrive, English captions are burned in, and
+`cards.html` supplies the title and end cards. Output: `concourse-demo.mp4` on the `video` branch and the Releases page,
+with `VOICEOVER.md` — a cue sheet. To add a human narration: play the mp4, record yourself reading the cue sheet on a
+phone, then `python3 eval/video/make_demo.py assemble <video-branch-folder> out.mp4 narration.m4a` (the first word is
+aligned to the first title card automatically).
+
 ## Subtitles
 Every Telugu line she hears is in `docs/TELUGU_SCRIPT.md` with its English meaning — paste from there; the stage texts
 are deterministic for the sample journey, so the lines in the video are exactly those.

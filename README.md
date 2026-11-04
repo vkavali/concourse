@@ -70,10 +70,10 @@ the model id next to every call.
 | Reach a parent who only uses WhatsApp | **WhatsApp Business Cloud API** | webhooks in, voice notes (`voice: true`), images, 3-button replies, link buttons (`cta_url`), templates outside the 24-h window | Meta Graph API v25.0 |
 | Read the ticket (PDF or a crumpled boarding-pass photo) | **Muse Spark 1.3** (`muse-spark-1.3`, standard tier) | `/v1/chat/completions`, inline PDF/image, constrained JSON (`response_format: json_schema`) | Meta Model API |
 | Understand her Telugu voice note | **Muse Voice Transcribe 1.0** (`muse-voice-transcribe-1.0`) | `/v1/asr/transcribe`, WAV 16 kHz mono, `languageBias: ["Telugu","English"]`, airport `keywords` | Meta Model API |
-| Classify what she means (gate? help? son? start my trip?) | **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights) first when `SPARK_OPEN_BASE_URL` is set, **Muse Spark 1.3** otherwise and whenever the open model fails | intent + confidence + tool proposal; code decides and answers from verified facts | Baseten partner inference / Meta Model API |
+| Classify what she means (gate? help? son? start my trip?) | **Muse Spark 1.3**; optionally **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights) first when `SPARK_OPEN_BASE_URL` is set — not exercised in the recorded run | intent + confidence + tool proposal; code decides and answers from verified facts | Baseten partner inference / Meta Model API |
 | Read the board she photographs, or points the camera at | **Muse Spark 1.3** (vision) | `visible_text`, `gate_codes`, one `explicit_arrow`; `location_claim` is typed null | Meta Model API |
 | Outline the board in her camera | **SAM 3.1** (`sam-3.1`) | asked for "sign" on each frame, in parallel with Spark; the travel screen draws the box with the matched word — a highlight, never a direction | Meta Model API |
-| Speak Telugu | **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, CC-BY-NC 4.0) or **MMS-TTS Telugu** (`facebook/mms-tts-tel`, CC-BY-NC 4.0) — Meta open weights | text → speech phrase by phrase, pauses engineered in code, Opus voice notes | our Modal deployment (`modal/`); the notes on the tape were synthesized by MMS-TTS in CI (`eval/judge-path/prerender_voice.py`) and each carries a sidecar naming its model |
+| Speak Telugu | **MMS-TTS Telugu** (`facebook/mms-tts-tel`, CC-BY-NC 4.0) — the voice on the tape; **SeamlessM4T v2** (`facebook/seamless-m4t-v2-large`, CC-BY-NC 4.0) supported, not exercised — Meta open weights | text → speech phrase by phrase, pauses engineered in code, Opus voice notes | our Modal deployment (`modal/`); the notes on the tape were synthesized by MMS-TTS in CI (`eval/judge-path/prerender_voice.py`) and each carries a sidecar naming its model |
 
 What is deliberately **not** a model: the journey state machine, the stage timing, the safety check on every outbound
 message, and the cards (drawn in code from verified facts). The sentence we are judged by: *Spark interprets the human;
@@ -98,6 +98,26 @@ gate change: only a verified operations event (`POST /ops/events`, labelled "sim
 - **Evidence, not inference** (`evidence/`): Spark reports `visible_text`, `gate_codes`, one `explicit_arrow`; `location_claim` is typed null and dropped if ever filled. A direction is spoken only when an arrow was photographed, and only as "follow the arrow". SAM's box is a highlight on the screen, nothing she hears depends on it.
 - **Voice** (`tts/`, `voice/`): spoken Telugu written as spoken (reviewed in `docs/TELUGU_SCRIPT.md`), gate codes read letter by letter with their own beat, synthesized phrase by phrase with pauses engineered in code, cached per speaker.
 - **The tape** (`ops/ModelTape`): every model call recorded by input hash, replayed for judges without keys; every call on the simulator's ticker with its model id and latency.
+
+## Status at submission (Nov 4, 2026) — what was and was not verified
+
+Verified:
+- 201 automated tests and the 36-case adversarial safety suite, green in CI on every commit.
+- The whole demo path end to end against **live Meta Model API calls** — Muse Spark 1.3 (ticket, intents, sign reading),
+  SAM 3.1 (sign segmentation), Muse Voice Transcribe 1.0 — recorded on Nov 2 and replayed by CI on every commit since
+  (`eval/judge-path/smoke.sh`, strict). Her voice is Meta's MMS-TTS Telugu, synthesized by CI.
+- The demo video is that same path, recorded by the `video` workflow: nothing in it is staged outside the code.
+
+Not verified before the deadline — said plainly so no one has to find out:
+- **Real WhatsApp phones.** The Cloud API client (webhook, media, buttons, templates, voice notes) is implemented and
+  tested against the API's documented contract, but an end-to-end run on real phones did not happen: the test business
+  account was auto-locked on Oct 27 and the re-run was not completed. The outbox/simulator is the same code with the
+  transport swapped, so a judge with a test number may hit edges we did not.
+- **A real elderly user.** The walkthrough in `docs/WALKTHROUGH.md` was not run; `eval/walkthrough/RESULTS.md` is empty.
+- **SeamlessM4T v2 and Muse Spark Open** are implemented behind flags (`TTS_BASE_URL`, `SPARK_OPEN_BASE_URL`) and were
+  not exercised in the recorded run.
+- Latency numbers exist only from a GitHub runner (`eval/latency/RESULTS.md`): Spark intent calls took 7–16 s there,
+  which misses our own under-10-seconds target for a voice round trip.
 
 ## Evals
 

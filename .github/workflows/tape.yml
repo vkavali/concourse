@@ -54,7 +54,7 @@ jobs:
           modal secret create --force concourse-tts TTS_TOKEN="${{ secrets.TTS_TOKEN }}" >/dev/null 2>&1 || true
           mkdir -p build
           modal deploy modal/seamless_tts.py 2>&1 | tee build/modal-deploy.log
-          url=$(tr -d '\n' < build/modal-deploy.log | grep -oE 'https://[a-zA-Z0-9.-]+\.modal\.run' | head -1)
+          url=$(sed 's/\x1b\[[0-9;]*m//g' build/modal-deploy.log | tr -d ' \n\r\t' | grep -oE 'https://[a-zA-Z0-9.-]+\.modal\.run' | head -1)
           [ -n "$url" ] || { echo "no modal.run URL in the deploy output"; exit 1; }
           echo "TTS_BASE_URL=$url" >> "$GITHUB_ENV"
           for i in $(seq 1 30); do curl -fs "$url/health" && break; sleep 10; done

@@ -1,8 +1,8 @@
 {
-  "recorded_at": "2026-11-02T18:39:20+00:00",
-  "model": "facebook/mms-tts-tel",
-  "op": "note",
-  "ms": 6288,
-  "rate": 0.7,
-  "source": "eval/judge-path/prerender_voice.py (CI run 41501705990)"
+  "recorded_at" : "2026-11-05T00:56:23.416998460Z",
+  "model" : "facebook/seamless-m4t-v2-large",
+  "op" : "note",
+  "ms" : 2216,
+  "speaker" : 0,
+  "source" : "live TTS server"
 }

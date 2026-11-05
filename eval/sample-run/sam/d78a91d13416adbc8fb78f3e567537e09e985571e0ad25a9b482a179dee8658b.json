@@ -1,8 +1,8 @@
 {
-  "recorded_at" : "2026-11-02T19:15:36.493510555Z",
+  "recorded_at" : "2026-11-05T00:56:24.997809207Z",
   "model" : "sam-3.1",
   "op" : "segment",
-  "ms" : 659,
+  "ms" : 1541,
   "boxes" : 1,
   "output" : "<0f>0<|box;x1=85;y1=135;x2=1194;y2=584;w=1280;h=720;c=0.7142857313156128|><|mask;x=0;y=0;c=0.7142857313156128;data=415,1024,!!!!$47uxwIN_R!nmigVj8D374oyh&XO:F7jo)Wvm$om@$eN&uZ$x/&$^W+PA@mk(bef[`@ok'PA^Ak9Zg3&8U[0srthek[sfxIs?Po]s.k'e+BKk#k'K]ki^-GY?B^R+HXV'K`#47cm[rxvH7^8Aiuskw6iYfBRfkuqBj2R5@T&`y`0#CRJO)VK(oqo.lO&D(UOAl/-3*o&Vcm58qAmVe-D?VqgzS(E@^mhtW@JX#j^'[H'|>\n"
 }

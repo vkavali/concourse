@@ -1,8 +1,8 @@
 {
-  "recorded_at" : "2026-11-02T19:15:30.334905388Z",
+  "recorded_at" : "2026-11-05T00:56:04.141965357Z",
   "model" : "sam-3.1",
   "op" : "segment",
-  "ms" : 736,
+  "ms" : 1210,
   "boxes" : 1,
-  "output" : "<0f>0<|box;x1=84;y1=134;x2=1194;y2=585;w=1280;h=720;c=0.7575758099555969|><|mask;x=0;y=0;c=0.7575758099555969;data=417,1024,!!!!$07wwk/.$y0`!q.^l===L.ixI+xE9]AB7b82U)V*0.FhKZHk1#sjVb`.cy.W.Y9Qi%=jMFXqG3+B/qSS4Ck^4dR.V6w&xvxhaV3r6lS#I/#l(E'dIAxK]p9U:%BP9zPvDd34ak_s4of2a+rQ%7LpVSl&]XTfxa@e'6s-uixJ&J&FiF@+Mi@ws#9*.@'m_kCGC5c[7G.lA6Xe{kwLxUkNn[%NtFyvn-9e9f&eB9Q|>\n"
+  "output" : "<0f>0<|box;x1=84;y1=134;x2=1194;y2=585;w=1280;h=720;c=0.7575758099555969|><|mask;x=0;y=0;c=0.7575758099555969;data=417,1024,!!!!$.7wwk/.$y0`!q.^l===L.ixI+xE9]AB7b82U)V*0.FhKZHbJ$p[0K6IW4S?=+ll'5.nhP1OmT@a(`UtUs)5yV*w+u_-Skls$wpA+6asPfe@{+:w@z=[]k`DKpu1LU(d&4!P.k23Nak&FKuTRNZ@f@CPV5.h7HeIL3$xOOAe?eEc-:vYzv.#e_gK98h'RzsH%YK&WU8k!Z%$D3a&G+wh+A&1TX'd$nLIhk&!!|>\n"
 }

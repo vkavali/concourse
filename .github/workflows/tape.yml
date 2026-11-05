@@ -24,6 +24,8 @@ concurrency: tape
 jobs:
   record:
     runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
@@ -42,11 +44,24 @@ jobs:
       - name: Stand-in voice notes for the 🎤 samples (only when none exist)
         if: ${{ inputs.stand_in_inputs }}
         run: python3 eval/judge-path/prerender_voice.py --inputs eval/sample-run
+      - name: Deploy SeamlessM4T v2 on Modal (when the repository has a Modal token)
+        if: ${{ env.MODAL_TOKEN_ID != '' }}
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+        run: |
+          python3 -m pip install -q modal
+          modal secret create --force concourse-tts TTS_TOKEN="${{ secrets.TTS_TOKEN }}" >/dev/null 2>&1 || true
+          modal deploy modal/seamless_tts.py 2>&1 | tee build/modal-deploy.log
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.modal\.run[^ ]*' build/modal-deploy.log | head -1 | sed 's#/$##')
+          [ -n "$url" ] || { echo "no modal.run URL in the deploy output"; exit 1; }
+          echo "TTS_BASE_URL=$url" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do curl -fs "$url/health" && break; sleep 10; done
       - name: Record the judge path (TAPE_MODE=record)
         env:
           JUDGE_TAPE_MODE: record
           MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-          TTS_BASE_URL: ${{ secrets.TTS_BASE_URL }}
+          TTS_BASE_URL: ${{ secrets.TTS_BASE_URL || env.TTS_BASE_URL }}
           TTS_TOKEN: ${{ secrets.TTS_TOKEN }}
           TTS_SPEAKER: ${{ secrets.TTS_SPEAKER || '0' }}
         run: eval/judge-path/smoke.sh

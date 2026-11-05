@@ -1,0 +1,157 @@
+{
+  "total": 128.2,
+  "captions": [
+    {
+      "start": 0.0,
+      "end": 9.0,
+      "text": "Her son forwards the ticket. Muse Spark reads it; the journey is built: HYD → DOH → DFW, 15 stages.",
+      "vo": "He forwards her ticket on WhatsApp. Muse Spark reads it into an itinerary, and the journey is built: fifteen stages, Hyderabad to Dallas."
+    },
+    {
+      "start": 9.0,
+      "end": 22.0,
+      "text": "Her voice note: “start my trip.” She hears: “All right. Your trip has started. I will tell you what to do when it is time.”",
+      "vo": "She says “start my trip”, in Telugu. Voice Transcribe and Spark understand her, and she hears — [pause: her voice note plays]"
+    },
+    {
+      "start": 22.0,
+      "end": 34.0,
+      "text": "Check-in, at its time — her phone (right): the card and the note. “Go to the Qatar Airways counter. Give passport and ticket. Hand over the big bag. Take the boarding pass.”",
+      "vo": "At check-in time she gets a card with the word on the board, and a voice note. [pause: her voice note plays]"
+    },
+    {
+      "start": 34.0,
+      "end": 44.0,
+      "text": "Every stage fires on the journey's clock: security, gate, boarding, the flight, Doha. Code owns the timing.",
+      "vo": "Every stage fires on the journey's clock. Code owns the timing — the model never does."
+    },
+    {
+      "start": 44.0,
+      "end": 50.0,
+      "text": "Doha. Her next gate is not announced yet — and that is exactly what she is told.",
+      "vo": "Doha. Her next gate isn't announced yet, and Concourse says exactly that."
+    },
+    {
+      "start": 50.0,
+      "end": 62.0,
+      "text": "A verified operations event sets gate D14 (simulated, labelled). Her phone: the new card and note. His phone: the update.",
+      "vo": "A verified operations event sets gate D14 — simulated here, and labelled. Both phones get it. [pause: her voice note plays]"
+    },
+    {
+      "start": 62.0,
+      "end": 78.0,
+      "text": "Her voice note: “Where is my gate?” She hears: “Your Qatar Airways flight leaves from gate D14. Again: gate D14. See the card.”",
+      "vo": "She asks where her gate is. Answered from verified facts only: [pause: her voice note plays — “your flight leaves from gate D14”]"
+    },
+    {
+      "start": 78.0,
+      "end": 93.0,
+      "text": "Her photo of a sign. SAM 3.1 finds the board, Spark reads it: gates B. She hears: “This board is not your gate. Yours is D14. Look for boards that say D.”",
+      "vo": "She photographs a sign. SAM finds the board, Spark reads it: gates B. That's a mismatch, and she's told so. [pause: her voice note plays] No route is invented."
+    },
+    {
+      "start": 93.0,
+      "end": 105.0,
+      "text": "Her voice note: “I'm lost.” She gets her card and calm words; her son gets a message. No one claims to know where she is.",
+      "vo": "“I'm lost.” [pause: her voice note plays] Her son is told. Concourse never claims to know where she is."
+    },
+    {
+      "start": 105.0,
+      "end": 118.2,
+      "text": "Boarding, the long flight, Dallas: arrivals, immigration (she answers the officer herself), baggage, exit.",
+      "vo": "Boarding, the long flight, Dallas. Arrivals, immigration — she answers the officer herself — baggage, exit."
+    },
+    {
+      "start": 118.2,
+      "end": 126.2,
+      "text": "Outside, she presses “I'm here.” Her son's phone: journey complete.",
+      "vo": "Outside, she presses “I'm here”. [pause: her voice note plays] Not tracked. She told her family."
+    }
+  ],
+  "notes": [
+    {
+      "t": 10.24,
+      "file": "7.ogg",
+      "cap": 9,
+      "seq": 7
+    },
+    {
+      "t": 23.27,
+      "file": "11.ogg",
+      "cap": 10,
+      "seq": 11
+    },
+    {
+      "t": 45.25,
+      "file": "15.ogg",
+      "cap": 6,
+      "seq": 15
+    },
+    {
+      "t": 51.32,
+      "file": "38.ogg",
+      "cap": 10,
+      "seq": 38
+    },
+    {
+      "t": 63.25,
+      "file": "43.ogg",
+      "cap": 12,
+      "seq": 43
+    },
+    {
+      "t": 79.27,
+      "file": "48.ogg",
+      "cap": 10,
+      "seq": 48
+    },
+    {
+      "t": 94.24,
+      "file": "53.ogg",
+      "cap": 6,
+      "seq": 53
+    },
+    {
+      "t": 119.42,
+      "file": "57.ogg",
+      "cap": 4,
+      "seq": 57
+    }
+  ],
+  "pips": [
+    {
+      "t": 26.5,
+      "file": "checkin.png",
+      "seconds": 7
+    },
+    {
+      "t": 54.5,
+      "file": "gate.png",
+      "seconds": 7
+    },
+    {
+      "t": 83.5,
+      "file": "sign.png",
+      "seconds": 7
+    },
+    {
+      "t": 121.7,
+      "file": "here.png",
+      "seconds": 7
+    }
+  ],
+  "cards": {
+    "c1": 7,
+    "c2": 7,
+    "c3": 8,
+    "c4": 9,
+    "c5": 8
+  },
+  "card_vo": {
+    "c1": "Everything you're about to see was built between October 26th and November 4th.",
+    "c2": "My mother can fly nine thousand miles alone. The part she can't do is read the airport.",
+    "c3": "Her son sets it up because she can't. Spark interprets her, code controls the journey, and nothing is ever invented.",
+    "c4": "Every model that runs is Meta's — Spark, SAM 3.1, Voice Transcribe, and MMS for her voice — on WhatsApp, the app she already has.",
+    "c5": "Thirty-six safety cases green in CI. A hundred and three model calls, replayed from a recorded run. Zero invented directions. Concourse."
+  }
+}
